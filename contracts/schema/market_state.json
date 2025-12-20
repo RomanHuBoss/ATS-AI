@@ -1,0 +1,384 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ats-ai.dev/schemas/market_state.json",
+  "title": "Market State",
+  "description": "Real-time market state snapshot (Appendix B.1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "ts_utc_ms",
+    "market_data_id",
+    "data_gap_sec",
+    "is_gap_contaminated",
+    "instrument",
+    "timeframe",
+    "price",
+    "volatility",
+    "liquidity",
+    "derivatives",
+    "correlations",
+    "data_quality"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "7",
+      "description": "Schema version for compatibility tracking"
+    },
+    "snapshot_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic snapshot identifier"
+    },
+    "ts_utc_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Snapshot timestamp (UTC, milliseconds)"
+    },
+    "market_data_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Market data update identifier"
+    },
+    "data_gap_sec": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Detected data gap duration (seconds)"
+    },
+    "is_gap_contaminated": {
+      "type": "boolean",
+      "description": "Flag indicating data gap contamination"
+    },
+    "instrument": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Trading instrument (e.g., 'BTCUSDT')"
+    },
+    "timeframe": {
+      "type": "string",
+      "const": "H1",
+      "description": "Trading timeframe"
+    },
+    "price": {
+      "type": "object",
+      "required": ["last", "mid", "bid", "ask", "tick_size"],
+      "properties": {
+        "last": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Last traded price"
+        },
+        "mid": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Mid price (bid+ask)/2"
+        },
+        "bid": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Best bid price"
+        },
+        "ask": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Best ask price"
+        },
+        "tick_size": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum price increment"
+        }
+      },
+      "additionalProperties": false
+    },
+    "volatility": {
+      "type": "object",
+      "required": ["atr", "atr_z_short", "atr_z_long", "atr_window_short"],
+      "properties": {
+        "atr": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Average True Range"
+        },
+        "atr_z_short": {
+          "type": "number",
+          "description": "ATR z-score (short window)"
+        },
+        "atr_z_long": {
+          "type": "number",
+          "description": "ATR z-score (long window)"
+        },
+        "atr_window_short": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "description": "Short ATR window (bars)"
+        },
+        "hv30": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0,
+          "description": "30-day historical volatility (nullable)"
+        },
+        "hv30_z": {
+          "type": ["number", "null"],
+          "description": "HV30 z-score (nullable)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "liquidity": {
+      "type": "object",
+      "required": [
+        "spread_bps",
+        "depth_bid_usd",
+        "depth_ask_usd",
+        "impact_bps_est",
+        "orderbook_staleness_ms"
+      ],
+      "properties": {
+        "spread_bps": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Bid-ask spread (basis points)"
+        },
+        "depth_bid_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Bid side depth (USD)"
+        },
+        "depth_ask_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Ask side depth (USD)"
+        },
+        "impact_bps_est": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Estimated market impact (basis points)"
+        },
+        "orderbook_staleness_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Orderbook data age (milliseconds)"
+        },
+        "orderbook_last_update_id": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Last orderbook update ID (nullable)"
+        },
+        "orderbook_update_id_age_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Update ID age (milliseconds, nullable)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "derivatives": {
+      "type": "object",
+      "required": [
+        "funding_rate_spot",
+        "funding_period_hours",
+        "time_to_next_funding_sec"
+      ],
+      "properties": {
+        "funding_rate_spot": {
+          "type": "number",
+          "description": "Current funding rate"
+        },
+        "funding_rate_forecast": {
+          "type": ["number", "null"],
+          "description": "Forecasted funding rate (nullable)"
+        },
+        "funding_period_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Funding period duration (hours)"
+        },
+        "time_to_next_funding_sec": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Time to next funding event (seconds)"
+        },
+        "oi": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Open interest (nullable)"
+        },
+        "basis_value": {
+          "type": ["number", "null"],
+          "description": "Basis value (nullable)"
+        },
+        "basis_z": {
+          "type": ["number", "null"],
+          "description": "Basis z-score (nullable)"
+        },
+        "basis_vol_z": {
+          "type": ["number", "null"],
+          "description": "Basis volatility z-score (nullable)"
+        },
+        "adl_rank_quantile": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "ADL rank quantile (nullable, 0-1)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "correlations": {
+      "type": "object",
+      "required": ["tail_metrics_reliable", "tail_reliability_score"],
+      "properties": {
+        "tail_metrics_reliable": {
+          "type": "boolean",
+          "description": "Flag indicating tail metrics reliability"
+        },
+        "tail_reliability_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Tail reliability score (0-1)"
+        },
+        "tail_corr_to_btc": {
+          "type": ["number", "null"],
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Tail correlation to BTC (nullable, -1 to 1)"
+        },
+        "stress_beta_to_btc": {
+          "type": ["number", "null"],
+          "description": "Stress beta to BTC (nullable)"
+        },
+        "lambda_tail_dep": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Tail dependence coefficient (nullable, 0-1)"
+        },
+        "corr_matrix_snapshot_id": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Correlation matrix snapshot ID (nullable)"
+        },
+        "corr_matrix_age_sec": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Correlation matrix age (seconds, nullable)"
+        },
+        "gamma_s": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Stress gamma coefficient (nullable)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "data_quality": {
+      "type": "object",
+      "required": [
+        "suspected_data_glitch",
+        "stale_book_glitch",
+        "data_quality_score",
+        "dqs_critical",
+        "dqs_noncritical",
+        "dqs_sources",
+        "dqs_mult",
+        "staleness_price_ms",
+        "staleness_liquidity_ms",
+        "staleness_derivatives_sec",
+        "cross_exchange_dev_bps",
+        "price_sources_used",
+        "toxic_flow_suspected"
+      ],
+      "properties": {
+        "suspected_data_glitch": {
+          "type": "boolean",
+          "description": "Flag indicating suspected data glitch"
+        },
+        "stale_book_glitch": {
+          "type": "boolean",
+          "description": "Flag indicating stale orderbook glitch"
+        },
+        "data_quality_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall data quality score (0-1)"
+        },
+        "dqs_critical": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Critical DQS component (0-1)"
+        },
+        "dqs_noncritical": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Non-critical DQS component (0-1)"
+        },
+        "dqs_sources": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Sources quality score (0-1)"
+        },
+        "dqs_mult": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "DQS multiplier (0-1)"
+        },
+        "staleness_price_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Price data staleness (milliseconds)"
+        },
+        "staleness_liquidity_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Liquidity data staleness (milliseconds)"
+        },
+        "staleness_derivatives_sec": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Derivatives data staleness (seconds)"
+        },
+        "cross_exchange_dev_bps": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Cross-exchange deviation (basis points)"
+        },
+        "oracle_dev_frac": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Oracle deviation fraction (nullable)"
+        },
+        "oracle_staleness_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Oracle data staleness (milliseconds, nullable)"
+        },
+        "price_sources_used": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "description": "List of price sources used"
+        },
+        "toxic_flow_suspected": {
+          "type": "boolean",
+          "description": "Flag indicating suspected toxic flow"
+        },
+        "execution_price_improvement_bps": {
+          "type": ["number", "null"],
+          "description": "Execution price improvement (basis points, nullable)"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

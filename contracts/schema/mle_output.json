@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ats-ai.dev/schemas/mle_output.json",
+  "title": "MLE Output",
+  "description": "Meta-labeling engine output with decision, risk multiplier, and probabilities (Appendix B.4)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "model_id",
+    "artifact_sha256",
+    "feature_schema_version",
+    "calibration_version",
+    "decision",
+    "risk_mult",
+    "EV_R_price",
+    "p_fail",
+    "p_neutral",
+    "p_success"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "5",
+      "description": "Schema version for compatibility tracking"
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Model identifier"
+    },
+    "artifact_sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$",
+      "description": "Model artifact SHA256 checksum"
+    },
+    "feature_schema_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Feature schema version"
+    },
+    "calibration_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Calibration version"
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["REJECT", "WEAK", "NORMAL", "STRONG"],
+      "description": "MLE decision"
+    },
+    "risk_mult": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "description": "Risk multiplier (0-2)"
+    },
+    "EV_R_price": {
+      "type": "number",
+      "description": "Expected value in R units (price edge)"
+    },
+    "p_fail": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Probability of failure (0-1)"
+    },
+    "p_neutral": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Probability of neutral outcome (0-1)"
+    },
+    "p_success": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Probability of success (0-1)"
+    },
+    "p_stopout_noise": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Probability of stopout due to noise (nullable, 0-1)"
+    },
+    "expected_cost_R_preMLE": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Expected cost in R units pre-MLE (nullable)"
+    },
+    "expected_cost_R_postMLE": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Expected cost in R units post-MLE (nullable)"
+    }
+  },
+  "additionalProperties": false
+}

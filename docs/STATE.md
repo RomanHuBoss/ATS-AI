@@ -1,167 +1,85 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 4  
-**Статус:** Domain Models реализованы
+**Последнее обновление:** Iteration 5  
+**Статус:** JSON Schema Contracts реализованы
 
 ---
 
 ## Реализовано
 
-### Iteration 4: Domain Models — Pydantic V2 Core Entities
+### Iteration 5: JSON Schema Contracts & Validators
 
-**Цель:** Реализовать базовые доменные модели с Pydantic V2 для Position, Trade, Signal с полной валидацией и immutability.
+**Цель:** Создать формальные JSON Schema файлы для всех основных контрактов системы и реализовать валидаторы с полным тестовым покрытием.
 
 **Реализованные модули:**
 
-#### Доменные модели
-- ✅ `src/core/domain/position.py` — **Position** (Appendix B.2, portfolio_state.positions)
-  * Immutable Pydantic V2 модель (frozen=True)
-  * Полная валидация полей (минимум риска 0.10 USD, максимум 100% equity)
-  * Direction enum (LONG/SHORT)
-  * Методы: r_value(), total_pnl_usd()
-  * JSON сериализация/десериализация
-- ✅ `src/core/domain/trade.py` — **Trade** (закрытая позиция с результатами)
-  * Immutable Pydantic V2 модель (frozen=True)
-  * Direction enum (LONG/SHORT), ExitReason enum (TP/SL/MANUAL/TIMEOUT/EMERGENCY/SIGNAL_REVERSE)
-  * Валидация: exit_ts > entry_ts, exit_qty == entry_qty (partial closes не поддерживаются)
-  * Методы: r_value(), holding_time_hours(), is_winner(), is_loser(), is_breakeven()
-  * JSON сериализация/десериализация
-- ✅ `src/core/domain/signal.py` — **Signal** (Appendix B.3, engine_signal)
-  * Immutable Pydantic V2 модель (frozen=True)
-  * EngineType enum (TREND/RANGE), Direction enum (LONG/SHORT)
-  * Вложенные модели: SignalLevels, SignalContext, SignalConstraints (все immutable)
-  * Валидация направления уровней (LONG: TP > entry > SL, SHORT: TP < entry < SL)
-  * Валидация RR constraints (sl_max_atr_mult > sl_min_atr_mult)
-  * Методы: potential_profit(), potential_loss(), raw_rr(), validate_rr_constraint()
-  * JSON сериализация/десериализация
-- ✅ `src/core/domain/__init__.py` — Обновлён экспорт domain моделей
+#### JSON Schema контракты
+- ✅ `contracts/schema/market_state.json` — **Market State Schema** (Appendix B.1)
+  * JSON Schema draft 2020-12
+  * Полная схема рыночного состояния (price, volatility, liquidity, derivatives, correlations, data_quality)
+  * Schema version 7 для версионирования
+  * Self-contained определения (нет внешних ссылок)
+  * Валидация типов, constraints (min/max), enums, patterns
+- ✅ `contracts/schema/portfolio_state.json` — **Portfolio State Schema** (Appendix B.2)
+  * Полная схема портфельного состояния (equity, risk, states, positions)
+  * DRP/MLOps/trading mode enums
+  * Позиции с валидацией минимума риска (0.10 USD)
+  * Schema version 7
+- ✅ `contracts/schema/engine_signal.json` — **Engine Signal Schema** (Appendix B.3)
+  * Схема торгового сигнала от Engine (TREND/RANGE)
+  * Вложенные объекты: levels, context, constraints
+  * Schema version 3
+- ✅ `contracts/schema/mle_output.json` — **MLE Output Schema** (Appendix B.4)
+  * Схема выхода MLE модели (decision, risk_mult, probabilities)
+  * SHA256 pattern для artifact_sha256
+  * Вероятности в диапазоне [0, 1]
+  * Schema version 5
+
+#### Валидаторы контрактов
+- ✅ `src/core/contracts/validators.py` — **JSON Schema Validators**
+  * SchemaLoader с кэшированием схем
+  * Базовый класс ContractValidator
+  * Специализированные валидаторы: MarketStateValidator, PortfolioStateValidator, EngineSignalValidator, MLEOutputValidator
+  * Методы: validate(), is_valid(), iter_errors()
+  * Convenience функции: validate_market_state(), validate_portfolio_state(), validate_engine_signal(), validate_mle_output()
+- ✅ `src/core/contracts/__init__.py` — Экспорт валидаторов
 
 #### Тестирование
-- ✅ `tests/unit/test_domain_models.py` — Комплексные тесты Domain Models (Appendix B.2, B.3)
-  * Position: создание, валидация, R-value, JSON сериализация (9 тестов)
-  * Trade: создание, валидация, R-value, holding time, winner/loser, JSON (12 тестов)
-  * Signal: создание, валидация направлений, RR, constraints, JSON (16 тестов)
-  * Cross-model integration: Signal → Position, Position → Trade workflows (2 теста)
-  * 39 тестов, все проходят ✅
+- ✅ `tests/unit/test_json_schema_contracts.py` — Комплексные тесты JSON Schema (42 теста)
+  * Загрузка и валидация схем (3 теста)
+  * Market State валидация (10 тестов): required fields, types, constraints, enums, optional fields
+  * Portfolio State валидация (7 тестов): DRP states, drawdown limits, positions, risk constraints
+  * Engine Signal валидация (7 тестов): engine types, prices, holding hours, RR constraints
+  * MLE Output валидация (9 тестов): decisions, probabilities, SHA256, risk_mult bounds
+  * Pydantic интеграция (3 тесты): Signal и Position модели генерируют валидный JSON
+  * Итератор ошибок (1 тест): iter_errors возвращает все нарушения
+  * Все 42 теста проходят ✅
 
 **Статус сборки:**
 - Установка: pip install -e . ✅
-- Тесты: pytest tests/ ✅ (**247 тестов, все проходят** — добавлено 39 тестов)
-- Модели: Все Pydantic V2, frozen=True, полная валидация ✅
+- Тесты: pytest tests/ ✅ (**289 тестов, все проходят** — добавлено 42 теста)
+- JSON Schema валидация: все схемы валидны согласно draft 2020-12 ✅
+- Pydantic совместимость: Signal и Position модели генерируют валидный JSON ✅
 
 **Покрытие ТЗ:**
-- Appendix B.2 (portfolio_state.positions) — **100%** (Position модель реализована)
-- Appendix B.3 (engine_signal) — **100%** (Signal модель реализована)
-- 2.1.1.0 (RiskUnits интеграция) — **100%** (Position и Trade используют risk conversions)
-- Pydantic V2 требования — **100%** (все модели Pydantic V2 с валидацией)
-- Immutability — **100%** (frozen=True для всех моделей)
-- JSON Schema compatibility — **100%** (сериализация/десериализация работает)
+- Appendix B.1 (market_state) — **100%** (JSON Schema создана и протестирована)
+- Appendix B.2 (portfolio_state) — **100%** (JSON Schema создана и протестирована)
+- Appendix B.3 (engine_signal) — **100%** (JSON Schema создана и протестирована)
+- Appendix B.4 (mle_output) — **100%** (JSON Schema создана и протестирована)
+- JSON Schema spec compliance — **100%** (draft 2020-12)
+- Схемы самодостаточны (schema_version) — **100%**
 
 **Инварианты и гарантии:**
-1. **Immutability** — все модели frozen=True, случайные мутации невозможны
-2. **Type safety** — Enum типы вместо строковых литералов для Direction, EngineType, ExitReason
-3. **Валидация минимумов** — risk_amount_usd >= 0.10 USD (Position)
-4. **Валидация направлений** — SL/TP проверяются согласно direction (LONG/SHORT)
-5. **R-value корректность** — SL hit ≈ -1R (проверено в тестах Trade)
-6. **JSON совместимость** — все модели сериализуемы/десериализуемы без потери данных
-7. **Cross-model consistency** — Signal → Position → Trade workflow корректен
-
----
-
-### Iteration 3: Compounding — Safe Geometric Growth & Variance Drag
-
-**Цель:** Реализовать модуль Compounding (ТЗ 2.1.2, обязательное) для безопасного вычисления геометрического роста equity с защитой от domain violations и контроля variance drag.
-
-**Реализованные модули:**
-
-#### Математические примитивы
-- ✅ `src/core/math/compounding.py` — **Compounding** (ТЗ 2.1.2, обязательное)
-  * Domain restriction: r > -1 + compounding_r_floor_eps (COMPOUNDING_R_FLOOR_EPS = 1.0e-6)
-  * Безопасная проверка: safe_compound_rate, clamp_compound_rate_emergency
-  * Численно стабильный log return: safe_log_return с автоматическим переключением log1p/log
-  * Геометрический рост: compound_equity, compound_equity_trajectory
-  * Variance drag метрики: compute_variance_drag_metrics, check_variance_drag_critical
-  * Утилиты: estimate_trades_per_year
-  * Exception: CompoundingDomainViolation при r ≤ -1 + eps
-- ✅ `src/core/math/__init__.py` — Обновлён экспорт compounding функций
-
-#### Тестирование
-- ✅ `tests/unit/test_compounding.py` — Комплексные тесты Compounding (ТЗ 2.2, Appendix C.3)
-  * Тесты domain restriction (safe_compound_rate, clamp_compound_rate_emergency)
-  * Тесты численной стабильности (safe_log_return: log1p vs log)
-  * Тесты геометрического роста (compound_equity, compound_equity_trajectory)
-  * Тесты variance drag метрик (compute_variance_drag_metrics, check_variance_drag_critical)
-  * Тесты переполнений и устойчивости (overflow/underflow protection)
-  * Тесты инвариантов (AM-GM inequality, determinism, log equivalence)
-  * Граничные случаи и валидация параметров
-  * 64 теста, все проходят ✅
-
-**Статус сборки:**
-- Установка: `make install` ✅
-- Тесты: `make test` ✅ (208 тестов, все проходят — добавлено 64 теста)
-- Линтинг: `make lint` ✅
-- Форматирование: `make format` ✅
-
-**Покрытие ТЗ:**
-- 2.1.2: Domain restriction для log(1+r) — **100%** (обязательное, реализовано)
-- 2.1.2: Численно устойчивое вычисление компаундинга — **100%** (обязательное, реализовано)
-- 2.1.2: Контроль variance drag — **100%** (обязательное, реализовано)
-- 2.1.2: Обработка экстремального случая r < -1 → EMERGENCY — **100%** (exception реализован)
-- Appendix C.2: Epsilon-параметры compounding — **100%**
-
-**Инварианты и гарантии:**
-1. **Domain violation detection** — CompoundingDomainViolation при r ≤ -1 + eps (требует EMERGENCY DRP)
-2. **Численная стабильность** — log1p используется для |r| < 0.01, log для больших r
-3. **Детерминизм** — все операции воспроизводимы
-4. **AM-GM inequality** — geometric mean ≤ arithmetic mean для переменных returns
-5. **Variance drag non-negative** — variance_drag_per_trade ≥ 0 для переменных returns
-6. **Overflow protection** — sanitize_float предотвращает распространение inf
-7. **Log equivalence** — compound через multiplication == compound через log sum
-
----
-
-### Iteration 2: Numerical Safeguards — Core Math Safety Layer
-
-**Цель:** Реализовать модуль Numerical Safeguards (ТЗ 2.3, 8.4, обязательное) для обеспечения численной стабильности всех математических операций в системе.
-
-**Реализованные модули:**
-
-#### Математические примитивы
-- ✅ `src/core/math/numerical_safeguards.py` — **Numerical Safeguards** (ТЗ 2.3, 8.4, обязательное)
-  * Safe division: denom_safe_signed, denom_safe_unsigned, safe_divide
-  * NaN/Inf санитизация: is_valid_float, sanitize_float, sanitize_array
-  * Epsilon-защиты для сравнений: is_close, is_zero, is_positive, is_negative, compare_with_tolerance
-  * Epsilon-округление: round_to_epsilon, normalize_to_range
-  * Утилиты: clamp
-  * Валидация: validate_positive, validate_non_negative, validate_in_range
-  * Domain-specific epsilon: EPS_PRICE, EPS_QTY, EPS_CALC, EPS_FLOAT_COMPARE_REL/ABS
-- ✅ `src/core/math/__init__.py` — Обновлён экспорт численных safeguards
-
-#### Тестирование
-- ✅ `tests/unit/test_numerical_safeguards.py` — Комплексные тесты Numerical Safeguards (ТЗ 2.2, Appendix C.3)
-  * Тесты безопасного деления (signed/unsigned)
-  * Тесты NaN/Inf санитизации
-  * Тесты epsilon-сравнений
-  * Тесты округления и квантования
-  * Тесты валидации параметров
-  * Тесты интеграции (chain operations)
-  * 84 теста, все проходят ✅
-
-**Статус сборки:**
-- Установка: `make install` ✅
-- Тесты: `make test` ✅ (144 теста, все проходят — добавлено 84 теста)
-- Линтинг: `make lint` ✅
-- Форматирование: `make format` ✅
-
-**Покрытие ТЗ:**
-- 2.3: Numerical Safeguards — **100%** (обязательное, реализовано)
-- 8.4: Epsilon-защиты — **100%** (обязательное, реализовано)
-- Appendix C.1: Domain-specific epsilon-параметры — **100%**
-
-**Инварианты и гарантии:**
-1. **Деление на ноль невозможно** — все деления защищены epsilon-защитой
-2. **NaN/Inf не распространяются** — санитизация заменяет невалидные значения
-3. **Float-сравнения учитывают машинную точность** — используются epsilon-толерантности
+1. **Schema versioning** — все схемы имеют schema_version для tracking совместимости
+2. **Self-contained** — схемы не имеют внешних зависимостей (можно использовать вне Python)
+3. **Type safety** — строгая валидация типов (integer, number, string, boolean, null)
+4. **Constraints enforcement** — минимумы/максимумы (minimum, maximum, exclusiveMinimum)
+5. **Enum validation** — строгий контроль значений (DRP_state, MLOps_state, trading_mode, engine, direction, decision)
+6. **Pattern matching** — SHA256 checksums валидируются через regex
+7. **Required vs Optional** — чёткое разделение обязательных и опциональных полей
+8. **Pydantic compatibility** — существующие Pydantic модели генерируют валидный JSON
+9. **Error reporting** — iter_errors возвращает все нарушения с детализацией
+10. **Draft 2020-12 compliance** — современный стандарт JSON Schema
 4. **Детерминизм** — все операции воспроизводимы
 5. **Знак сохраняется** — denom_safe_signed корректно обрабатывает отрицательные значения
 

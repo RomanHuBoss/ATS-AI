@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ats-ai.dev/schemas/portfolio_state.json",
+  "title": "Portfolio State",
+  "description": "Portfolio state snapshot including equity, risk, positions (Appendix B.2)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "portfolio_id",
+    "ts_utc_ms",
+    "equity",
+    "risk",
+    "states",
+    "positions"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "7",
+      "description": "Schema version for compatibility tracking"
+    },
+    "snapshot_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic snapshot identifier"
+    },
+    "portfolio_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic portfolio state identifier"
+    },
+    "ts_utc_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Snapshot timestamp (UTC, milliseconds)"
+    },
+    "equity": {
+      "type": "object",
+      "required": [
+        "equity_usd",
+        "peak_equity_usd",
+        "drawdown_pct",
+        "drawdown_smoothed_pct"
+      ],
+      "properties": {
+        "equity_usd": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Current equity (USD)"
+        },
+        "peak_equity_usd": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Historical peak equity (USD)"
+        },
+        "drawdown_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Current drawdown (fraction, 0-1)"
+        },
+        "drawdown_smoothed_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Smoothed drawdown (fraction, 0-1)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "required": [
+        "current_portfolio_risk_pct",
+        "current_cluster_risk_pct",
+        "reserved_portfolio_risk_pct",
+        "reserved_cluster_risk_pct",
+        "current_sum_abs_risk_pct",
+        "reserved_sum_abs_risk_pct",
+        "reserved_heat_upper_bound_pct",
+        "adjusted_heat_base_pct",
+        "adjusted_heat_blend_pct",
+        "adjusted_heat_worst_pct",
+        "heat_uni_abs_pct",
+        "max_portfolio_risk_pct",
+        "max_sum_abs_risk_pct",
+        "cluster_risk_limit_pct",
+        "max_adjusted_heat_pct",
+        "max_trade_risk_cap_pct"
+      ],
+      "properties": {
+        "current_portfolio_risk_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current portfolio risk (fraction)"
+        },
+        "current_cluster_risk_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current cluster risk (fraction)"
+        },
+        "reserved_portfolio_risk_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Reserved portfolio risk (fraction)"
+        },
+        "reserved_cluster_risk_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Reserved cluster risk (fraction)"
+        },
+        "current_sum_abs_risk_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current sum of absolute risks (fraction)"
+        },
+        "reserved_sum_abs_risk_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Reserved sum of absolute risks (fraction)"
+        },
+        "reserved_heat_upper_bound_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Reserved heat upper bound (fraction)"
+        },
+        "adjusted_heat_base_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Adjusted heat base scenario (fraction)"
+        },
+        "adjusted_heat_blend_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Adjusted heat blended scenario (fraction)"
+        },
+        "adjusted_heat_worst_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Adjusted heat worst scenario (fraction)"
+        },
+        "heat_uni_abs_pct": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Heat under uniform absolute correlation (fraction)"
+        },
+        "max_portfolio_risk_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum portfolio risk limit (fraction)"
+        },
+        "max_sum_abs_risk_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum sum of absolute risks limit (fraction)"
+        },
+        "cluster_risk_limit_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Cluster risk limit (fraction)"
+        },
+        "max_adjusted_heat_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum adjusted heat limit (fraction)"
+        },
+        "max_trade_risk_cap_pct": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum single trade risk cap (fraction)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "states": {
+      "type": "object",
+      "required": [
+        "DRP_state",
+        "MLOps_state",
+        "trading_mode",
+        "warmup_bars_remaining",
+        "drp_flap_count"
+      ],
+      "properties": {
+        "DRP_state": {
+          "type": "string",
+          "enum": ["NORMAL", "DEGRADED", "DEFENSIVE", "EMERGENCY", "RECOVERY", "HIBERNATE"],
+          "description": "Disaster Recovery Protocol state"
+        },
+        "MLOps_state": {
+          "type": "string",
+          "enum": ["OK", "WARNING", "CRITICAL"],
+          "description": "MLOps health state"
+        },
+        "trading_mode": {
+          "type": "string",
+          "enum": ["LIVE", "PAPER", "SHADOW", "BACKTEST"],
+          "description": "Trading mode"
+        },
+        "warmup_bars_remaining": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Warmup bars remaining"
+        },
+        "drp_flap_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "DRP flap counter"
+        },
+        "hibernate_until_ts_utc_ms": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Hibernate until timestamp (UTC, milliseconds, nullable)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "positions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "instrument",
+          "cluster_id",
+          "direction",
+          "qty",
+          "entry_price",
+          "entry_eff_allin",
+          "sl_eff_allin",
+          "risk_amount_usd",
+          "risk_pct_equity",
+          "notional_usd",
+          "unrealized_pnl_usd",
+          "funding_pnl_usd",
+          "opened_ts_utc_ms"
+        ],
+        "properties": {
+          "instrument": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Trading instrument"
+          },
+          "cluster_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Correlation cluster ID"
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["long", "short"],
+            "description": "Position direction"
+          },
+          "qty": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Position quantity (always positive)"
+          },
+          "entry_price": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Entry price"
+          },
+          "entry_eff_allin": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Effective entry price (all-in)"
+          },
+          "sl_eff_allin": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Effective stop-loss price (all-in)"
+          },
+          "risk_amount_usd": {
+            "type": "number",
+            "minimum": 0.10,
+            "description": "Risk amount (USD, min 0.10)"
+          },
+          "risk_pct_equity": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 1,
+            "description": "Risk as fraction of equity (0-1)"
+          },
+          "notional_usd": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Notional value (USD)"
+          },
+          "unrealized_pnl_usd": {
+            "type": "number",
+            "description": "Unrealized PnL (USD)"
+          },
+          "funding_pnl_usd": {
+            "type": "number",
+            "description": "Funding PnL (USD)"
+          },
+          "opened_ts_utc_ms": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "description": "Position open timestamp (UTC, milliseconds)"
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Array of open positions"
+    }
+  },
+  "additionalProperties": false
+}

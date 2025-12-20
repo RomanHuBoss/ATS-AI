@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ats-ai.dev/schemas/engine_signal.json",
+  "title": "Engine Signal",
+  "description": "Trading signal from Engine (TREND or RANGE) with levels and constraints (Appendix B.3)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "instrument",
+    "engine",
+    "direction",
+    "signal_ts_utc_ms",
+    "levels",
+    "context",
+    "constraints"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "3",
+      "description": "Schema version for compatibility tracking"
+    },
+    "instrument": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Trading instrument (e.g., 'BTCUSDT')"
+    },
+    "engine": {
+      "type": "string",
+      "enum": ["TREND", "RANGE"],
+      "description": "Engine type"
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["long", "short"],
+      "description": "Signal direction"
+    },
+    "signal_ts_utc_ms": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "description": "Signal generation timestamp (UTC, milliseconds)"
+    },
+    "levels": {
+      "type": "object",
+      "required": ["entry_price", "stop_loss", "take_profit"],
+      "properties": {
+        "entry_price": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Entry price level"
+        },
+        "stop_loss": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Stop-loss price level"
+        },
+        "take_profit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Take-profit price level"
+        }
+      },
+      "additionalProperties": false
+    },
+    "context": {
+      "type": "object",
+      "required": ["expected_holding_hours", "setup_id"],
+      "properties": {
+        "expected_holding_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Expected holding period (hours)"
+        },
+        "regime_hint": {
+          "type": ["string", "null"],
+          "description": "Market regime hint (nullable)"
+        },
+        "setup_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Setup identifier"
+        }
+      },
+      "additionalProperties": false
+    },
+    "constraints": {
+      "type": "object",
+      "required": ["RR_min_engine", "sl_min_atr_mult", "sl_max_atr_mult"],
+      "properties": {
+        "RR_min_engine": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum risk-reward ratio from Engine (pre-costs)"
+        },
+        "sl_min_atr_mult": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Minimum stop-loss in ATR multiples"
+        },
+        "sl_max_atr_mult": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Maximum stop-loss in ATR multiples"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

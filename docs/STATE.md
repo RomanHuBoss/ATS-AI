@@ -1,11 +1,75 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 5  
-**Статус:** JSON Schema Contracts реализованы
+**Последнее обновление:** Iteration 6  
+**Статус:** Pydantic V2 State Models реализованы
 
 ---
 
 ## Реализовано
+
+### Iteration 6: Pydantic V2 State Models — MarketState, PortfolioState, MLEOutput
+
+**Цель:** Создать полные Pydantic V2 модели для трех основных state-объектов системы (market_state, portfolio_state, mle_output) с полной совместимостью с JSON Schema.
+
+**Реализованные модули:**
+
+#### Pydantic V2 State Models
+- ✅ `src/core/domain/market_state.py` — **MarketState** (Appendix B.1)
+  * Полная Pydantic V2 модель с 6 nested моделями: Price, Volatility, Liquidity, Derivatives, Correlations, DataQuality
+  * frozen=True для immutability
+  * Валидация всех полей согласно JSON Schema constraints
+  * Optional поля с корректной типизацией
+  * Pattern matching для schema_version и timeframe
+- ✅ `src/core/domain/portfolio_state.py` — **PortfolioState** (Appendix B.2)
+  * Полная Pydantic V2 модель с 3 nested моделями: Equity, Risk, States
+  * Enum types: DRPState, MLOpsState, TradingMode
+  * Интеграция с Position модель (список позиций)
+  * Валидация drawdown как фракции (0-1), не процентов
+  * frozen=True для immutability
+- ✅ `src/core/domain/mle_output.py` — **MLEOutput** (Appendix B.4)
+  * Полная Pydantic V2 модель
+  * Enum type: MLEDecision (REJECT/WEAK/NORMAL/STRONG)
+  * SHA256 pattern валидация для artifact_sha256
+  * Вероятности в диапазоне [0, 1]
+  * frozen=True для immutability
+- ✅ `src/core/domain/__init__.py` — Обновлён экспорт всех моделей
+
+#### Тестирование
+- ✅ `tests/unit/test_pydantic_state_models.py` — Комплексные тесты state моделей (40 тестов)
+  * MarketState тесты (10 тестов): создание, сериализация, десериализация, immutability, nested models, constraints
+  * PortfolioState тесты (14 тестов): создание, сериализация, enum валидация, интеграция с Position, drawdown validation
+  * MLEOutput тесты (11 тестов): создание, сериализация, decision enum, SHA256 pattern, probability bounds
+  * Cross-model integration (2 теста): множественные позиции, full roundtrip
+  * Nested models (3 теста): Price, Volatility, Liquidity, Derivatives, Correlations, DataQuality
+  * Все 40 тестов проходят ✅
+
+**Статус сборки:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/ ✅ (**329 тестов, все проходят** — добавлено 40 тестов)
+- JSON Schema compliance: все модели генерируют валидный JSON согласно JSON Schema ✅
+- Pydantic V2 features: frozen=True, field validators, pattern matching работают ✅
+
+**Покрытие ТЗ:**
+- Appendix B.1 (market_state) — **100%** (Pydantic модель создана и протестирована)
+- Appendix B.2 (portfolio_state) — **100%** (Pydantic модель создана и протестирована)
+- Appendix B.4 (mle_output) — **100%** (Pydantic модель создана и протестирована)
+- Pydantic V2 immutability — **100%** (frozen=True для всех моделей)
+- JSON Schema compatibility — **100%** (все модели генерируют валидный JSON)
+- Enum types — **100%** (DRPState, MLOpsState, TradingMode, MLEDecision)
+
+**Инварианты и гарантии:**
+1. **Immutability** — все модели frozen=True, изменения невозможны
+2. **JSON Schema compliance** — model_dump() генерирует валидный JSON согласно схемам
+3. **Type safety** — Enum types вместо строковых литералов
+4. **Nested models** — сложные структуры разбиты на логические модели
+5. **Validation** — все constraints (min/max, patterns, enums) валидируются
+6. **Optional fields** — корректная типизация Optional[T] | None
+7. **Integration** — Position модель seamlessly интегрирована в PortfolioState
+8. **Roundtrip** — сериализация → валидация → десериализация работает без потерь
+9. **Drawdown as fraction** — drawdown_pct в диапазоне [0, 1], не проценты
+10. **Schema versioning** — все модели имеют schema_version constraint
+
+---
 
 ### Iteration 5: JSON Schema Contracts & Validators
 
@@ -170,9 +234,50 @@
 
 ## Что дальше
 
-### Приоритет 1: Критические математические примитивы (Iteration 1-3)
+### Приоритет 1: Критические математические примитивы (Iteration 1-3) ✅ ЗАВЕРШЕНО
 
 1. ✅ **EffectivePrices** (ТЗ 2.1.1.1, обязательное) — **ЗАВЕРШЕНО**
+   - 51 тестов ✅
+
+2. ✅ **Numerical Safeguards** (Appendix C.1, обязательное) — **ЗАВЕРШЕНО**
+   - Safe division (signed/unsigned)
+   - Epsilon-защиты (EPS_PRICE, EPS_QTY, EPS_CALC)
+   - Proximity testing (is_close)
+   - Sanitization функции
+   - 84 тестов ✅
+
+3. ✅ **Compounding** (ТЗ 8.3.2, обязательное) — **ЗАВЕРШЕНО**
+   - Geometric returns
+   - Variance drag
+   - Domain violation detection
+   - Log-space calculations
+   - 64 тестов ✅
+
+### Приоритет 2: Domain Models & Contracts (Iteration 4-6) ✅ ЗАВЕРШЕНО
+
+4. ✅ **Domain Models** (обязательное) — **ЗАВЕРШЕНО**
+   - Position, Trade, Signal Pydantic V2 models
+   - Enum types (Direction, EngineType, ExitReason)
+   - Immutability (frozen=True)
+   - Cross-model validation
+   - 39 тестов ✅
+
+5. ✅ **JSON Schema контракты** (Appendix B, обязательное) — **ЗАВЕРШЕНО**
+   - `contracts/schema/market_state.json`
+   - `contracts/schema/portfolio_state.json`
+   - `contracts/schema/engine_signal.json`
+   - `contracts/schema/mle_output.json`
+   - Тесты валидации схем
+   - 42 тестов ✅
+
+6. ✅ **Pydantic V2 State Models** (Appendix B, обязательное) — **ЗАВЕРШЕНО**
+   - MarketState (6 nested models)
+   - PortfolioState (3 nested models, Position integration)
+   - MLEOutput (MLEDecision enum)
+   - JSON Schema compliance
+   - 40 тестов ✅
+
+### Приорит 3: Data Quality System (Iteration 7-8) — СЛЕДУЮЩИЙ ШАГ
    - `src/core/math/effective_prices.py` ✅
    - All-in эффективные цены: entry/tp/sl с учётом spread/fees/slippage/impact ✅
    - `unit_risk_allin_net = abs(entry_eff_allin - sl_eff_allin)` ✅
@@ -319,21 +424,34 @@
 - **Iteration 2**: 100% (Numerical Safeguards полностью покрыт тестами — 84 теста)
 - **Iteration 3**: 100% (Compounding полностью покрыт тестами — 64 теста)
 - **Iteration 4**: 100% (Domain Models полностью покрыты тестами — 39 тестов)
+- **Iteration 5**: 100% (JSON Schema Contracts полностью покрыты тестами — 42 теста)
+- **Iteration 6**: 100% (Pydantic State Models полностью покрыты тестами — 40 тестов)
 
 ### Соответствие ТЗ
-- **Обязательные требования реализовано**: 5 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models)
-- **Процент готовности**: ~10%
+- **Обязательные требования реализовано**: 6 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models)
+- **Процент готовности**: ~12%
 
 ### Следующие вехи
-- **Iteration 5** (3-5 дней): JSON Schema контракты → ~12%
-- **Iteration 6-7** (1-2 недели): DQS → ~18%
-- **Iteration 8-12** (2-3 недели): Risk Core → ~30%
+- **Iteration 7-8** (1-2 недели): DQS → ~18%
+- **Iteration 9-13** (2-3 недели): Risk Core → ~30%
 
 ---
 
 ## Заметки для команды
 
-**Iteration 4 — Domain Models:**
+**Iteration 6 — Pydantic State Models:**
+1. **Pydantic V2** — все state модели используют Pydantic V2 с frozen=True для immutability
+2. **Nested models** — сложные структуры разбиты на логические модели (Price, Volatility, Equity, Risk и т.д.)
+3. **Enum types** — DRPState, MLOpsState, TradingMode, MLEDecision используют Python Enum для type safety
+4. **Drawdown as fraction** — ВАЖНО: drawdown_pct в диапазоне [0, 1] (фракция), не проценты! 4.76% = 0.0476
+5. **JSON Schema compliance** — model_dump() генерирует JSON полностью совместимый с JSON Schema validators
+6. **Position integration** — Position модель seamlessly интегрирована в PortfolioState.positions
+7. **Optional fields** — используется Optional[T] | None для nullable полей согласно JSON Schema
+8. **Pattern matching** — schema_version, timeframe, artifact_sha256 валидируются через regex patterns
+9. **Roundtrip safety** — Pydantic model → JSON → Schema validation → Pydantic model работает без потерь
+10. **Future extensions** — модели готовы к расширению новыми полями (добавлять в конец для обратной совместимости)
+
+**Iteration 5 — JSON Schema Contracts:**
 1. **Pydantic V2** — все модели используют Pydantic V2 с frozen=True для immutability
 2. **Enum types** — Direction, EngineType, ExitReason используют Python Enum для type safety
 3. **Trade модель** — создана на основе логики системы (нет явной схемы в ТЗ), соответствует workflow Position → Trade
@@ -376,5 +494,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 5  
-**Следующий шаг:** JSON Schema контракты (Appendix B, обязательное)
+**Статус:** ✅ Готов к Iteration 7  
+**Следующий шаг:** DQS — Data Quality Score (ТЗ 9.2, обязательное, GATE 0)

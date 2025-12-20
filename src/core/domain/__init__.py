@@ -1,9 +1,29 @@
 """
 Domain models and value objects.
 
-Contains fundamental domain entities like RiskUnits, Position, Trade, Signal.
+Contains fundamental domain entities like RiskUnits, Position, Trade, Signal,
+and state models (MarketState, PortfolioState, MLEOutput).
 """
 
+from src.core.domain.market_state import (
+    Correlations,
+    DataQuality,
+    Derivatives,
+    Liquidity,
+    MarketState,
+    Price,
+    Volatility,
+)
+from src.core.domain.mle_output import MLEDecision, MLEOutput
+from src.core.domain.portfolio_state import (
+    DRPState,
+    Equity,
+    MLOpsState,
+    PortfolioState,
+    Risk,
+    States,
+    TradingMode,
+)
 from src.core.domain.position import Direction as PositionDirection
 from src.core.domain.position import Position
 from src.core.domain.signal import Direction as SignalDirection
@@ -57,5 +77,24 @@ __all__ = [
     "SignalLevels",
     "SignalContext",
     "SignalConstraints",
+    # MarketState model
+    "MarketState",
+    "Price",
+    "Volatility",
+    "Liquidity",
+    "Derivatives",
+    "Correlations",
+    "DataQuality",
+    # PortfolioState model
+    "PortfolioState",
+    "Equity",
+    "Risk",
+    "States",
+    "DRPState",
+    "MLOpsState",
+    "TradingMode",
+    # MLEOutput model
+    "MLEOutput",
+    "MLEDecision",
 ]
 

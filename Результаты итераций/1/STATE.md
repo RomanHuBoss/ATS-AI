@@ -1,58 +1,11 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 2  
-**Статус:** Numerical Safeguards реализован
+**Последнее обновление:** Iteration 1  
+**Статус:** EffectivePrices реализован
 
 ---
 
 ## Реализовано
-
-### Iteration 2: Numerical Safeguards — Core Math Safety Layer
-
-**Цель:** Реализовать модуль Numerical Safeguards (ТЗ 2.3, 8.4, обязательное) для обеспечения численной стабильности всех математических операций в системе.
-
-**Реализованные модули:**
-
-#### Математические примитивы
-- ✅ `src/core/math/numerical_safeguards.py` — **Numerical Safeguards** (ТЗ 2.3, 8.4, обязательное)
-  * Safe division: denom_safe_signed, denom_safe_unsigned, safe_divide
-  * NaN/Inf санитизация: is_valid_float, sanitize_float, sanitize_array
-  * Epsilon-защиты для сравнений: is_close, is_zero, is_positive, is_negative, compare_with_tolerance
-  * Epsilon-округление: round_to_epsilon, normalize_to_range
-  * Утилиты: clamp
-  * Валидация: validate_positive, validate_non_negative, validate_in_range
-  * Domain-specific epsilon: EPS_PRICE, EPS_QTY, EPS_CALC, EPS_FLOAT_COMPARE_REL/ABS
-- ✅ `src/core/math/__init__.py` — Обновлён экспорт численных safeguards
-
-#### Тестирование
-- ✅ `tests/unit/test_numerical_safeguards.py` — Комплексные тесты Numerical Safeguards (ТЗ 2.2, Appendix C.3)
-  * Тесты безопасного деления (signed/unsigned)
-  * Тесты NaN/Inf санитизации
-  * Тесты epsilon-сравнений
-  * Тесты округления и квантования
-  * Тесты валидации параметров
-  * Тесты интеграции (chain operations)
-  * 84 теста, все проходят ✅
-
-**Статус сборки:**
-- Установка: `make install` ✅
-- Тесты: `make test` ✅ (144 теста, все проходят — добавлено 84 теста)
-- Линтинг: `make lint` ✅
-- Форматирование: `make format` ✅
-
-**Покрытие ТЗ:**
-- 2.3: Numerical Safeguards — **100%** (обязательное, реализовано)
-- 8.4: Epsilon-защиты — **100%** (обязательное, реализовано)
-- Appendix C.1: Domain-specific epsilon-параметры — **100%**
-
-**Инварианты и гарантии:**
-1. **Деление на ноль невозможно** — все деления защищены epsilon-защитой
-2. **NaN/Inf не распространяются** — санитизация заменяет невалидные значения
-3. **Float-сравнения учитывают машинную точность** — используются epsilon-толерантности
-4. **Детерминизм** — все операции воспроизводимы
-5. **Знак сохраняется** — denom_safe_signed корректно обрабатывает отрицательные значения
-
----
 
 ### Iteration 1: EffectivePrices — All-In Effective Price Module
 
@@ -148,14 +101,14 @@
    - Минимальный unit risk валидация ✅
    - Тесты: LONG/SHORT симметрия, инвариант SL = -1R ✅
 
-2. ✅ **Numerical Safeguards** (ТЗ 2.3, 8.4, обязательное) — **ЗАВЕРШЕНО**
-   - `src/core/math/numerical_safeguards.py` ✅
-   - Safe division (denom_safe_signed, denom_safe_unsigned) ✅
-   - NaN/Inf санитизация ✅
-   - Epsilon-защиты для сравнений float ✅
-   - Тесты устойчивости (84 теста) ✅
+2. **Numerical Safeguards** (ТЗ 2.3, 8.4, следующий приоритет)
+   - `src/core/math/numerical_safeguards.py`
+   - Safe division (denom_safe_signed, denom_safe_unsigned)
+   - NaN/Inf санитизация
+   - Epsilon-защиты для сравнений float
+   - Тесты устойчивости
 
-3. **Compounding** (ТЗ 2.3.2, следующий приоритет)
+3. **Compounding** (ТЗ 2.3.2)
    - `src/core/math/compounding.py`
    - Безопасный геометрический рост
    - Domain restriction: r > -1 + eps
@@ -273,14 +226,13 @@
 ### Покрытие кода
 - **Iteration 0**: 100% (RiskUnits полностью покрыт тестами)
 - **Iteration 1**: 100% (EffectivePrices полностью покрыт тестами)
-- **Iteration 2**: 100% (Numerical Safeguards полностью покрыт тестами — 84 теста)
 
 ### Соответствие ТЗ
-- **Обязательные требования реализовано**: 3 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards)
-- **Процент готовности**: ~6%
+- **Обязательные требования реализовано**: 2 из ~50 (RiskUnits + EffectivePrices)
+- **Процент готовности**: ~4%
 
 ### Следующие вехи
-- **Iteration 3** (3-5 дней): Compounding → ~8%
+- **Iteration 2-3** (1 неделя): Numerical Safeguards + Compounding → ~8%
 - **Iteration 4-5** (1 неделя): Контракты и схемы → ~12%
 - **Iteration 6-7** (1-2 недели): DQS → ~18%
 - **Iteration 8-12** (2-3 недели): Risk Core → ~30%
@@ -288,15 +240,6 @@
 ---
 
 ## Заметки для команды
-
-**Iteration 2 — Numerical Safeguards:**
-1. **Domain-specific epsilon** — используются разные epsilon для разных доменов (EPS_PRICE, EPS_QTY, EPS_CALC)
-2. **Safe division** — две версии: signed (сохраняет знак) и unsigned (всегда положительный)
-3. **Validation** — функции validate_* выбрасывают исключения при невалидных значениях
-4. **is_close** — использует комбинацию относительной и абсолютной толерантности (как Python's math.isclose)
-5. **Performance** — epsilon-защиты добавляют накладные расходы ~5-10% на критических путях, но обеспечивают стабильность
-6. **Idempotency** — sanitize_float идемпотентна: sanitize(sanitize(x)) == sanitize(x)
-7. **Integration** — все существующие модули (RiskUnits, EffectivePrices) должны постепенно мигрировать на использование numerical_safeguards
 
 **Iteration 1 — EffectivePrices:**
 1. **Impact model** — упрощённая линейная модель (placeholder). Полная модель с учётом ликвидности и orderbook depth будет реализована в модуле `src/exm/impact_model.py`.
@@ -313,5 +256,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 3  
-**Следующий шаг:** Реализация Compounding (ТЗ 2.3.2, обязательное)
+**Статус:** ✅ Готов к Iteration 2  
+**Следующий шаг:** Реализация Numerical Safeguards (ТЗ 2.3, 8.4, обязательное)

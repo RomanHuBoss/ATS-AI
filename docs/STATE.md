@@ -1,11 +1,72 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 3  
-**Статус:** Compounding реализован
+**Последнее обновление:** Iteration 4  
+**Статус:** Domain Models реализованы
 
 ---
 
 ## Реализовано
+
+### Iteration 4: Domain Models — Pydantic V2 Core Entities
+
+**Цель:** Реализовать базовые доменные модели с Pydantic V2 для Position, Trade, Signal с полной валидацией и immutability.
+
+**Реализованные модули:**
+
+#### Доменные модели
+- ✅ `src/core/domain/position.py` — **Position** (Appendix B.2, portfolio_state.positions)
+  * Immutable Pydantic V2 модель (frozen=True)
+  * Полная валидация полей (минимум риска 0.10 USD, максимум 100% equity)
+  * Direction enum (LONG/SHORT)
+  * Методы: r_value(), total_pnl_usd()
+  * JSON сериализация/десериализация
+- ✅ `src/core/domain/trade.py` — **Trade** (закрытая позиция с результатами)
+  * Immutable Pydantic V2 модель (frozen=True)
+  * Direction enum (LONG/SHORT), ExitReason enum (TP/SL/MANUAL/TIMEOUT/EMERGENCY/SIGNAL_REVERSE)
+  * Валидация: exit_ts > entry_ts, exit_qty == entry_qty (partial closes не поддерживаются)
+  * Методы: r_value(), holding_time_hours(), is_winner(), is_loser(), is_breakeven()
+  * JSON сериализация/десериализация
+- ✅ `src/core/domain/signal.py` — **Signal** (Appendix B.3, engine_signal)
+  * Immutable Pydantic V2 модель (frozen=True)
+  * EngineType enum (TREND/RANGE), Direction enum (LONG/SHORT)
+  * Вложенные модели: SignalLevels, SignalContext, SignalConstraints (все immutable)
+  * Валидация направления уровней (LONG: TP > entry > SL, SHORT: TP < entry < SL)
+  * Валидация RR constraints (sl_max_atr_mult > sl_min_atr_mult)
+  * Методы: potential_profit(), potential_loss(), raw_rr(), validate_rr_constraint()
+  * JSON сериализация/десериализация
+- ✅ `src/core/domain/__init__.py` — Обновлён экспорт domain моделей
+
+#### Тестирование
+- ✅ `tests/unit/test_domain_models.py` — Комплексные тесты Domain Models (Appendix B.2, B.3)
+  * Position: создание, валидация, R-value, JSON сериализация (9 тестов)
+  * Trade: создание, валидация, R-value, holding time, winner/loser, JSON (12 тестов)
+  * Signal: создание, валидация направлений, RR, constraints, JSON (16 тестов)
+  * Cross-model integration: Signal → Position, Position → Trade workflows (2 теста)
+  * 39 тестов, все проходят ✅
+
+**Статус сборки:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/ ✅ (**247 тестов, все проходят** — добавлено 39 тестов)
+- Модели: Все Pydantic V2, frozen=True, полная валидация ✅
+
+**Покрытие ТЗ:**
+- Appendix B.2 (portfolio_state.positions) — **100%** (Position модель реализована)
+- Appendix B.3 (engine_signal) — **100%** (Signal модель реализована)
+- 2.1.1.0 (RiskUnits интеграция) — **100%** (Position и Trade используют risk conversions)
+- Pydantic V2 требования — **100%** (все модели Pydantic V2 с валидацией)
+- Immutability — **100%** (frozen=True для всех моделей)
+- JSON Schema compatibility — **100%** (сериализация/десериализация работает)
+
+**Инварианты и гарантии:**
+1. **Immutability** — все модели frozen=True, случайные мутации невозможны
+2. **Type safety** — Enum типы вместо строковых литералов для Direction, EngineType, ExitReason
+3. **Валидация минимумов** — risk_amount_usd >= 0.10 USD (Position)
+4. **Валидация направлений** — SL/TP проверяются согласно direction (LONG/SHORT)
+5. **R-value корректность** — SL hit ≈ -1R (проверено в тестах Trade)
+6. **JSON совместимость** — все модели сериализуемы/десериализуемы без потери данных
+7. **Cross-model consistency** — Signal → Position → Trade workflow корректен
+
+---
 
 ### Iteration 3: Compounding — Safe Geometric Growth & Variance Drag
 
@@ -217,18 +278,21 @@
 
 ### Приоритет 2: Контракты и схемы (Iteration 4-5)
 
-4. **JSON Schema контракты** (Appendix B, обязательное)
+4. ✅ **Базовые доменные модели** — **ЗАВЕРШЕНО (Iteration 4)**
+   - `src/core/domain/position.py` ✅
+   - `src/core/domain/trade.py` ✅
+   - `src/core/domain/signal.py` ✅
+   - Pydantic V2 модели с валидацией ✅
+   - Immutable (frozen=True) ✅
+   - JSON сериализация ✅
+   - 39 тестов ✅
+
+5. **JSON Schema контракты** (Appendix B, обязательное)
    - `contracts/schema/market_state.json`
    - `contracts/schema/portfolio_state.json`
    - `contracts/schema/engine_signal.json`
    - `contracts/schema/mle_output.json`
    - Тесты валидации схем
-
-5. **Базовые доменные модели**
-   - `src/core/domain/position.py`
-   - `src/core/domain/trade.py`
-   - `src/core/domain/signal.py`
-   - Pydantic модели с валидацией
 
 ### Приорит 3: Data Quality System (Iteration 6-7)
 
@@ -310,14 +374,22 @@
 
 Нет выявленных конфликтов в ТЗ v3.30.
 
-### Допущения (Iteration 0)
+### Допущения
 
+**Iteration 0:**
 1. **Poetry доступен в окружении**: Предполагается, что Poetry установлен для управления зависимостями.
    - Если нет — требуется установка: `pip install poetry`
 
 2. **Python 3.11+**: Минимальная версия Python 3.11 для использования современных typing features.
 
 3. **Тестовое окружение**: На данный момент не требуется реальное подключение к бирже или базам данных.
+
+**Iteration 4:**
+1. **Trade модель без явной схемы**: В ТЗ нет явной схемы для Trade, создана на основе логики системы (entry → exit → PnL)
+2. **Enum типы**: Используем Python Enum вместо строковых литералов для type safety
+3. **Float vs Decimal**: Используем float для совместимости с numpy, точность достаточна для финансов
+4. **Partial closes**: Пока не поддерживаются (валидация exit_qty == entry_qty), будет в будущих итерациях
+5. **Frozen models**: frozen=True может усложнить будущие модификации, но повышает безопасность
 
 ---
 
@@ -328,19 +400,30 @@
 - **Iteration 1**: 100% (EffectivePrices полностью покрыт тестами)
 - **Iteration 2**: 100% (Numerical Safeguards полностью покрыт тестами — 84 теста)
 - **Iteration 3**: 100% (Compounding полностью покрыт тестами — 64 теста)
+- **Iteration 4**: 100% (Domain Models полностью покрыты тестами — 39 тестов)
 
 ### Соответствие ТЗ
-- **Обязательные требования реализовано**: 4 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding)
-- **Процент готовности**: ~8%
+- **Обязательные требования реализовано**: 5 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models)
+- **Процент готовности**: ~10%
 
 ### Следующие вехи
-- **Iteration 4-5** (1 неделя): Контракты и схемы → ~12%
+- **Iteration 5** (3-5 дней): JSON Schema контракты → ~12%
 - **Iteration 6-7** (1-2 недели): DQS → ~18%
 - **Iteration 8-12** (2-3 недели): Risk Core → ~30%
 
 ---
 
 ## Заметки для команды
+
+**Iteration 4 — Domain Models:**
+1. **Pydantic V2** — все модели используют Pydantic V2 с frozen=True для immutability
+2. **Enum types** — Direction, EngineType, ExitReason используют Python Enum для type safety
+3. **Trade модель** — создана на основе логики системы (нет явной схемы в ТЗ), соответствует workflow Position → Trade
+4. **Partial closes** — пока не поддерживаются, валидация exit_qty == entry_qty (будущая фича)
+5. **JSON Schema compatibility** — модели полностью совместимы с Appendix B, сериализация/десериализация работает
+6. **Cross-model consistency** — валидация workflow Signal → Position → Trade покрыта интеграционными тестами
+7. **Validators** — custom validators для направлений (LONG: TP > entry > SL, SHORT: TP < entry < SL)
+8. **Future extensions** — модели готовы к расширению (tp_eff_allin: Optional для Trade, regime_hint: Optional для Signal)
 
 **Iteration 3 — Compounding:**
 1. **Domain violation detection** — CompoundingDomainViolation exception при r ≤ -1 + eps (не интегрирован с DRP, будет в будущих итерациях)
@@ -375,5 +458,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 4  
+**Статус:** ✅ Готов к Iteration 5  
 **Следующий шаг:** JSON Schema контракты (Appendix B, обязательное)

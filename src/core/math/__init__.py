@@ -49,6 +49,25 @@ from src.core.math.effective_prices import (
     validate_unit_risk,
 )
 
+# Compounding (ТЗ 2.1.2)
+from src.core.math.compounding import (
+    COMPOUNDING_R_FLOOR_EPS,
+    LOG1P_SWITCH_THRESHOLD,
+    TARGET_RETURN_ANNUAL_DEFAULT,
+    TRADES_PER_YEAR_DEFAULT,
+    VARIANCE_DRAG_CRITICAL_FRAC,
+    CompoundingDomainViolation,
+    VarianceDragMetrics,
+    check_variance_drag_critical,
+    clamp_compound_rate_emergency,
+    compound_equity,
+    compound_equity_trajectory,
+    compute_variance_drag_metrics,
+    estimate_trades_per_year,
+    safe_compound_rate,
+    safe_log_return,
+)
+
 __all__ = [
     # Numerical Safeguards — Epsilon constants
     "EPS_CALC",
@@ -90,4 +109,23 @@ __all__ = [
     "calculate_unit_risk_allin_net",
     "compute_effective_prices_with_validation",
     "validate_unit_risk",
+    # Compounding — Constants
+    "COMPOUNDING_R_FLOOR_EPS",
+    "LOG1P_SWITCH_THRESHOLD",
+    "TARGET_RETURN_ANNUAL_DEFAULT",
+    "TRADES_PER_YEAR_DEFAULT",
+    "VARIANCE_DRAG_CRITICAL_FRAC",
+    # Compounding — Exceptions
+    "CompoundingDomainViolation",
+    # Compounding — Types
+    "VarianceDragMetrics",
+    # Compounding — Functions
+    "check_variance_drag_critical",
+    "clamp_compound_rate_emergency",
+    "compound_equity",
+    "compound_equity_trajectory",
+    "compute_variance_drag_metrics",
+    "estimate_trades_per_year",
+    "safe_compound_rate",
+    "safe_log_return",
 ]

@@ -1,0 +1,14 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.2, pluggy-1.6.0
+rootdir: /home/claude
+configfile: pyproject.toml
+collected 208 items
+
+tests/unit/test_compounding.py ......................................... [ 19%]
+.......................                                                  [ 30%]
+tests/unit/test_effective_prices.py .................................    [ 46%]
+tests/unit/test_numerical_safeguards.py ................................ [ 62%]
+........................................................                 [ 88%]
+tests/unit/test_units_sanity.py .......................                  [100%]
+
+============================= 208 passed in 0.29s ==============================

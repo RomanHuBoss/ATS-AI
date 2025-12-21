@@ -436,7 +436,11 @@ def test_gate10_low_correlation_pass(
         ("BTCUSDT", "ETHUSDT"): 0.40,  # Low correlation
     }
     
-    gate = Gate10CorrelationExposure()
+    # Config with higher concentration limit to allow 50% concentration
+    config = Gate10Config(
+        max_single_position_concentration_hard=0.60,
+    )
+    gate = Gate10CorrelationExposure(config=config)
     
     result = gate.evaluate(
         signal=base_signal,
@@ -498,7 +502,11 @@ def test_gate10_high_correlation_soft_warning(
         ("BTCUSDT", "ETHUSDT"): 0.75,  # Above soft (0.70), below hard (0.85)
     }
     
-    gate = Gate10CorrelationExposure()
+    # Config with higher concentration limit to allow 60% concentration
+    config = Gate10Config(
+        max_single_position_concentration_hard=0.70,
+    )
+    gate = Gate10CorrelationExposure(config=config)
     
     result = gate.evaluate(
         signal=base_signal,
@@ -626,7 +634,11 @@ def test_gate10_opposite_direction_negative_correlation(
         ("BTCUSDT", "ETHUSDT"): 0.80,
     }
     
-    gate = Gate10CorrelationExposure()
+    # Config with higher concentration limit to allow 50% concentration
+    config = Gate10Config(
+        max_single_position_concentration_hard=0.60,
+    )
+    gate = Gate10CorrelationExposure(config=config)
     
     result = gate.evaluate(
         signal=base_signal,  # LONG
@@ -695,7 +707,11 @@ def test_gate10_exposure_within_limits_pass(
         ),
     ]
     
-    gate = Gate10CorrelationExposure()
+    # Config with higher concentration limit to allow 42.9% concentration
+    config = Gate10Config(
+        max_single_position_concentration_hard=0.50,
+    )
+    gate = Gate10CorrelationExposure(config=config)
     
     result = gate.evaluate(
         signal=base_signal,
@@ -746,14 +762,16 @@ def test_gate10_total_exposure_soft_warning(
     config = Gate10Config(
         max_total_exposure_r=4.0,  # Low limit
         exposure_soft_utilization=0.80,  # 80%
+        max_single_position_concentration_hard=0.50,  # Allow 42.9% concentration
     )
     
-    # Positions with total 3.0R (projected 4.0R after new 1.0R position)
+    # Positions with total 2.5R (projected 3.5R after new 1.0R position)
+    # Utilization: 3.5 / 4.0 = 87.5% (between soft 80% and hard 95%)
     positions = [
         PositionInfo(
             instrument="ETHUSDT",
             direction=Direction.LONG,
-            exposure_r=2.0,
+            exposure_r=1.5,
             asset_class="CRYPTO",
             sector=None,
             entry_ts_utc_ms=int(datetime.now(timezone.utc).timestamp() * 1000),
@@ -792,8 +810,8 @@ def test_gate10_total_exposure_soft_warning(
     assert result.entry_allowed is True  # WARNING, not BLOCK
     
     # Exposure metrics
-    assert result.exposure_metrics.projected_total_exposure_r == 4.0
-    assert result.exposure_metrics.total_exposure_utilization == 1.0  # 4.0 / 4.0
+    assert result.exposure_metrics.projected_total_exposure_r == 3.5  # 2.5 + 1.0
+    assert abs(result.exposure_metrics.total_exposure_utilization - 0.875) < 0.01  # 3.5 / 4.0 = 87.5%
     assert result.exposure_metrics.exposure_warning is True
     assert "approaching limit" in result.exposure_metrics.exposure_reason.lower()
 
@@ -988,7 +1006,11 @@ def test_gate10_sector_exposure_hard_block(
             regime_hint="TREND_UP",
             setup_id="setup_001",
         ),
-        constraints={},
+        constraints={
+            "RR_min_engine": 2.0,
+            "sl_min_atr_mult": 1.0,
+            "sl_max_atr_mult": 3.0,
+        },
     )
     
     gate = Gate10CorrelationExposure(config=config)
@@ -1036,10 +1058,11 @@ def test_gate10_max_positions_soft_warning(
     passing_gate09,
 ):
     """Test GATE 10 soft WARNING при приближении к max positions."""
-    # Config with low max_positions_soft
+    # Config with low max_positions_soft and higher concentration limit
     config = Gate10Config(
         max_positions_soft=3,
         max_positions_hard=5,
+        max_single_position_concentration_hard=0.50,  # Allow 40% concentration
     )
     
     # 2 existing positions (projected 3 = soft limit)
@@ -1168,6 +1191,7 @@ def test_gate10_concentration_soft_warning(
     # Config with low concentration limits
     config = Gate10Config(
         max_single_position_concentration_soft=0.30,
+        max_single_position_concentration_hard=0.60,  # Allow 50% concentration
     )
     
     # Small existing positions, new position будет 33% от total

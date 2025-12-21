@@ -155,6 +155,14 @@ class States(BaseModel):
     hibernate_until_ts_utc_ms: int | None = Field(
         None, description="Timestamp окончания hibernate (UTC, миллисекунды, nullable)"
     )
+    
+    # Manual halt flags (GATE 1)
+    manual_halt_new_entries: bool = Field(
+        default=False, description="Ручная блокировка новых входов (kill-switch)"
+    )
+    manual_halt_all_trading: bool = Field(
+        default=False, description="Ручная блокировка всей торговли (emergency stop)"
+    )
 
     model_config = {"frozen": True}
 

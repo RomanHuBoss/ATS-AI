@@ -1,7 +1,72 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 8  
-**Статус:** Gatekeeper GATE 0 — Warm-up, DQS Integration, DRP State Machine, Anti-flapping реализованы
+**Последнее обновление:** Iteration 9  
+**Статус:** Gatekeeper GATE 0-1 — Warm-up/DQS/DRP + DRP Kill-switch/Manual Halt/Trading Mode реализованы
+
+---
+
+## Реализовано
+
+### Iteration 9: Gatekeeper GATE 1 — DRP Kill-switch, Manual Halt, Trading Mode
+
+**Цель:** Реализовать GATE 1 с DRP emergency kill-switch, проверкой manual halt flags и trading mode валидацией.
+
+**Реализованные модули:**
+
+#### Portfolio State Extensions
+- ✅ `src/core/domain/portfolio_state.py` — **States модель расширена**
+  * `manual_halt_new_entries` — ручная блокировка новых входов (kill-switch)
+  * `manual_halt_all_trading` — ручная блокировка всей торговли (emergency stop)
+  * Поля с default=False для обратной совместимости
+
+#### Gatekeeper
+- ✅ `src/gatekeeper/gates/gate_01_drp_killswitch.py` — **Gate01DRPKillswitch**
+  * Второй gate в цепочке (после GATE 0)
+  * Блокировка при manual halt flags (приоритет 1)
+  * Trading mode проверка (LIVE/SHADOW проходят, PAPER/BACKTEST блокируются)
+  * DRP kill-switch через интеграцию с GATE 0 results
+  * Shadow mode indicator для будущей логики early exit после GATE 6
+  * Приоритет проверок: manual halt > trading mode > GATE 0 results
+  * Детальная диагностика (DRP state, trading mode, manual flags)
+
+#### Тестирование
+- ✅ `tests/unit/test_gate_01.py` — Тесты GATE 1 (20 тестов)
+  * PASS scenarios (LIVE mode, SHADOW mode, DEFENSIVE state)
+  * Manual halt flags (manual_halt_all_trading, manual_halt_new_entries, both)
+  * Trading mode checks (PAPER/BACKTEST блокируются)
+  * DRP state integration (EMERGENCY, RECOVERY, HIBERNATE блокировки через GATE 0)
+  * Hard-gate integration
+  * Priority checks (manual > trading mode > GATE 0)
+  * Edge cases (SHADOW + manual halt, immutability)
+
+**Статус сборки:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/ ✅ (**435 тестов, все проходят** — добавлено 20 тестов)
+- GATE 1: все блокировки и интеграции работают ✅
+- Manual halt flags: корректно блокируют новые входы ✅
+- Trading mode: SHADOW/LIVE проходят, PAPER/BACKTEST блокируются ✅
+- Integration с GATE 0: корректно использует DRP state ✅
+
+**Покрытие ТЗ:**
+- ТЗ 3.3.2 строка 1018 (GATE 1: DRP / Emergency / Kill-switch) — **100%** (реализован и протестирован)
+- ТЗ 3.3.2 строка 1037 (SHADOW mode early exit после GATE 6) — **частично** (SHADOW проходит GATE 1, early exit будет позже)
+- ТЗ строка 2773 (trading_mode enum) — **100%** (все режимы поддерживаются)
+- Manual halt flags — **100%** (новая функциональность, реализована полностью)
+
+**Инварианты и гарантии:**
+1. **Priority order** — manual halt > trading mode > GATE 0 results
+2. **Manual halt enforcement** — manual_halt_all_trading блокирует раньше manual_halt_new_entries
+3. **Trading mode validation** — LIVE/SHADOW проходят, PAPER/BACKTEST блокируются
+4. **DRP integration** — GATE 1 использует DRP state из GATE 0 без дублирования transitions
+5. **SHADOW mode support** — SHADOW разрешен в GATE 1 (early exit будет после GATE 6)
+6. **Immutability** — Gate01Result frozen=True для безопасности
+7. **GATE order** — GATE 1 выполняется после GATE 0, использует его результаты
+8. **Backward compatibility** — manual halt flags имеют default=False
+9. **Fail-safe** — любая блокировка в GATE 0 автоматически блокирует GATE 1
+10. **Diagnostics** — полная диагностика в details field (DRP state, trading mode, manual flags)
+
+---
+
 
 ---
 
@@ -598,7 +663,7 @@
 - **Процент готовности**: ~16%
 
 ### Следующие вехи
-- **Iteration 9-11** (1-2 недели): GATE 1-6 (DRP kill-switch, MRC, Strategy compatibility, Signal validation, Pre-sizing, MLE decision) → ~22%
+- **Iteration 10-12** (1-2 недели): GATE 1-6 (DRP kill-switch, MRC, Strategy compatibility, Signal validation, Pre-sizing, MLE decision) → ~22%
 - **Iteration 12-15** (2-3 недели): GATE 7-14 (Liquidity, Gap, Funding, Basis-risk, Sanity, Bankruptcy, REM, Sizing) → ~30%
 - **Iteration 16-18** (1-2 недели): GATE 15-18 (Impact, Reservation, Final validation, Partial fills) → ~34%
 - **Iteration 19-25** (3-4 недели): Risk Core (Portfolio risk, Correlation, Tail-risk) → ~46%
@@ -686,5 +751,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 9  
+**Статус:** ✅ Готов к Iteration 10  
 **Следующий шаг:** Gatekeeper GATE 1-6 — DRP kill-switch, MRC confidence, Strategy compatibility, Signal validation, Pre-sizing, MLE decision (ТЗ 3.3.2-3.3.3, обязательные, GATE 1-6)

@@ -8,7 +8,9 @@
 - GATE 4: Signal Validation
 - GATE 5: Pre-sizing + Size-invariant Costs
 - GATE 6: MLE Decision (size-invariant price-edge)
-- GATE 7-18: дальнейшие гейты (будущие итерации)
+- GATE 7: Liquidity Check
+- GATE 8: Gap/Data Glitch Detection
+- GATE 9-18: дальнейшие гейты (будущие итерации)
 """
 
 from .gate_00_warmup_dqs import Gate00WarmupDQS, Gate00Result
@@ -18,6 +20,21 @@ from .gate_03_strategy_compat import Gate03StrategyCompat, Gate03Result
 from .gate_04_signal_validation import Gate04SignalValidation, Gate04Result, Gate04Config
 from .gate_05_pre_sizing import Gate05PreSizing, Gate05Result, Gate05Config
 from .gate_06_mle_decision import Gate06MLEDecision, Gate06Result, Gate06Config, MLEDecision
+from .gate_07_liquidity_check import (
+    Gate07LiquidityCheck,
+    Gate07Result,
+    Gate07Config,
+    LiquidityMetrics,
+    LiquidityMultipliers,
+)
+from .gate_08_gap_glitch import (
+    Gate08GapGlitch,
+    Gate08Result,
+    Gate08Config,
+    PricePoint,
+    AnomalyMetrics,
+    DRPTrigger,
+)
 
 __all__ = [
     "Gate00WarmupDQS",
@@ -39,4 +56,15 @@ __all__ = [
     "Gate06Result",
     "Gate06Config",
     "MLEDecision",
+    "Gate07LiquidityCheck",
+    "Gate07Result",
+    "Gate07Config",
+    "LiquidityMetrics",
+    "LiquidityMultipliers",
+    "Gate08GapGlitch",
+    "Gate08Result",
+    "Gate08Config",
+    "PricePoint",
+    "AnomalyMetrics",
+    "DRPTrigger",
 ]

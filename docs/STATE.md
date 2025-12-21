@@ -1,20 +1,112 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 13  
-**Статус:** Gatekeeper GATE 0-7 реализованы — Warm-up/DQS/DRP + DRP Kill-switch/Manual Halt/Trading Mode + MRC Confidence/Conflict Resolution + Strategy Compatibility + Signal Validation + Pre-sizing + MLE Decision + Liquidity Check
+**Последнее обновление:** Iteration 14  
+**Статус:** Gatekeeper GATE 0-8 реализованы — Warm-up/DQS/DRP + DRP Kill-switch/Manual Halt/Trading Mode + MRC Confidence/Conflict Resolution + Strategy Compatibility + Signal Validation + Pre-sizing + MLE Decision + Liquidity Check + Gap/Data Glitch Detection
 
 ---
 
 ## Реализовано
 
-### Iteration 13: Documentation Update — GATE 7 Status Confirmation
+### Iteration 14: Gatekeeper GATE 8 — Gap/Data Glitch Detection
 
-**Цель:** Подтвердить реализацию GATE 7 (был реализован в iteration 12, но не документирован) и подготовить план для GATE 8-9.
+**Цель:** Реализовать GATE 8 с детектированием аномалий цен (gaps, spikes, glitches) и инициированием DRP при критических обнаружениях.
 
-**Статус GATE 7:**
-- ✅ GATE 7 полностью реализован и протестирован
-- ✅ 22 теста проходят успешно
-- ✅ Все требования ТЗ покрыты
+**Реализованные модули:**
+
+#### Gatekeeper GATE 8
+- ✅ `src/gatekeeper/gates/gate_08_gap_glitch.py` — **Gate08GapGlitch**
+  * Девятый gate в цепочке (после GATE 0-7)
+  * Size-invariant anomaly checks (не зависит от qty)
+  * PricePoint dataclass для хранения price history
+  * Price jump detection: |price_now - price_prev| / price_prev > threshold
+  * Price spike detection: z-score метод с minimum 5 price points
+  * Stale orderbook detection: orderbook_age > threshold при fresh price
+  * suspected_data_glitch flag для комплексной диагностики
+  * DRP trigger mechanism с severity levels (LOW/MEDIUM/HIGH)
+  * Hard limits для price_jump_hard_pct и price_spike_zscore_hard
+  * Soft detection для suspected_data_glitch
+  * Gate08Config для гибкой настройки всех порогов
+  * Детальная диагностика через AnomalyMetrics, DRPTrigger, Gate08Result
+
+#### Формулы GATE 8
+
+**1. Price jump (%):**
+```
+price_jump_pct = |price_current - price_prev| / price_prev * 100
+detected = price_jump_pct > price_jump_threshold_pct
+hard_reject = price_jump_pct > price_jump_hard_pct
+```
+
+**2. Price spike (z-score):**
+```
+price_mean = mean(price_history)
+price_stddev = stddev(price_history)
+price_zscore = |price_current - price_mean| / price_stddev
+detected = price_zscore > price_spike_zscore_threshold
+hard_reject = price_zscore > price_spike_zscore_hard
+```
+
+**3. Stale book detection:**
+```
+orderbook_age_ms = current_price_ts - orderbook_ts
+price_age_ms = 0  # Current price is fresh
+stale_book_fresh_price = (orderbook_age_ms > max_orderbook_age_ms) AND (price_age_ms < max_price_age_ms)
+```
+
+**4. Suspected glitch:**
+```
+suspected_data_glitch = price_jump_detected OR price_spike_detected OR stale_book_fresh_price
+```
+
+**5. DRP trigger evaluation:**
+```
+HIGH severity: price_zscore > drp_trigger_zscore OR price_jump_pct > drp_trigger_jump_pct
+MEDIUM severity: any suspected_data_glitch
+```
+
+#### Hard blocks в GATE 8:
+1. **GATE 0-7 блокировка** — если любой из предыдущих gates блокирует
+2. **price_jump_hard_reject** — price_jump_pct > price_jump_hard_pct
+3. **price_spike_hard_reject** — price_zscore > price_spike_zscore_hard
+4. **suspected_data_glitch** — любая аномалия при glitch_block_enabled=True
+
+#### Тестирование GATE 8
+- ✅ `tests/unit/test_gate_08.py` — Тесты GATE 8 (20 тестов)
+  * Price jump detection (4 теста: small pass, soft detected, hard reject, no history)
+  * Price spike detection (3 теста: soft detected, hard reject, insufficient history)
+  * Stale book detection (2 теста: detected, fresh pass)
+  * Suspected glitch (2 теста: multiple anomalies, disabled block)
+  * DRP trigger mechanism (3 теста: high severity, medium severity, disabled)
+  * Integration с GATE 0-7 (2 теста: GATE 0 blocked, full chain pass)
+  * Edge cases (4 теста: zero stddev, orderbook ahead, exact threshold, strict config)
+
+**Статус сборки GATE 8:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/unit/test_gate_08.py ✅ (**20 тестов, все проходят**)
+- GATE 8: все расчёты size-invariant ✅
+- Price jump detection: работает корректно ✅
+- Price spike detection: z-score метод работает корректно ✅
+- Stale book detection: корректно определяет несоответствия timestamps ✅
+- suspected_data_glitch flag: корректно устанавливается ✅
+- DRP trigger: работает с severity levels ✅
+- Integration: GATE 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 chain работает ✅
+
+**Покрытие ТЗ для GATE 8:**
+- ТЗ 3.3.2 строка 1025, 1053 (GATE 8: Gap/Data Glitch Detection) — **100%** (реализован и протестирован)
+- ТЗ раздел 9.4 (Gap handling и data glitch detection) — **100%** (реализован)
+- DRP trigger mechanism при data anomalies — **100%** (реализован)
+
+**Инварианты и гарантии GATE 8:**
+1. **Size-invariant checks** — все проверки не зависят от qty_actual
+2. **Price jump detection** — работает с single previous price point
+3. **Price spike detection** — требует minimum 5 price points для z-score
+4. **Stale book detection** — корректно определяет несоответствие timestamps
+5. **suspected_data_glitch flag** — устанавливается при любой аномалии
+6. **DRP trigger mechanism** — работает с severity levels (LOW/MEDIUM/HIGH)
+7. **Hard limits enforcement** — price_jump_hard и spike_hard строго соблюдаются
+8. **Gate order** — GATE 8 после GATE 0-7
+9. **Immutability** — Gate08Result frozen=True
+10. **Integration ready** — GATE 8 готов к интеграции в full gatekeeper chain
 
 ---
 
@@ -183,7 +275,7 @@ spoofing_suspected = depth_volatility_cv > threshold
 
 ## Архитектурный контекст
 
-### Реализованные Gates (0-7)
+### Реализованные Gates (0-8)
 
 **GATE 0: Warm-up / DQS**
 - Warm-up состояние после DRP
@@ -233,30 +325,37 @@ spoofing_suspected = depth_volatility_cv > threshold
 - liquidity_mult calculation (smooth degradation)
 - Impact estimate
 
+**GATE 8: Gap/Data Glitch Detection**
+- Price jump detection (% threshold)
+- Price spike detection (z-score based)
+- Stale book detection
+- suspected_data_glitch flag
+- DRP trigger mechanism (LOW/MEDIUM/HIGH severity)
+
 ### Integration Chain Status
 
 ```
-Signal → GATE 0 → GATE 1 → GATE 2 → GATE 3 → GATE 4 → GATE 5 → GATE 6 → GATE 7 → [GATE 8...] → Decision
-         ✅       ✅        ✅        ✅        ✅        ✅        ✅        ✅
+Signal → GATE 0 → GATE 1 → GATE 2 → GATE 3 → GATE 4 → GATE 5 → GATE 6 → GATE 7 → GATE 8 → [GATE 9...] → Decision
+         ✅       ✅        ✅        ✅        ✅        ✅        ✅        ✅        ✅
 ```
 
 ---
 
 ## Что дальше
 
-### Следующие приоритеты (GATE 8-9)
-
-**GATE 8: Gap / Data Glitch Detection**
-- Требования из ТЗ 3.3.2 строка 1025, 1053
-- Раздел 9.4: "Gap handling и data glitch detection"
-- Контроль аномалий и suspected_data_glitch
-- Инициирование DRP при glitch
+### Следующие приоритеты (GATE 9-10)
 
 **GATE 9: Funding Filter + Proximity + Blackout**
 - Требования из ТЗ 3.3.2 строка 1026, 1054
 - Funding rate filter
 - Proximity model (близость к событиям)
 - Blackout conditions
+
+**GATE 10: Correlation / Exposure Conflict**
+- Требования из ТЗ 3.3.2 строка 1027, 1055
+- Correlation checks между позициями
+- Exposure conflict detection
+- Portfolio-level constraints
 
 ### Риски и технический долг
 
@@ -285,13 +384,14 @@ Signal → GATE 0 → GATE 1 → GATE 2 → GATE 3 → GATE 4 → GATE 5 → GAT
 - ✅ GATE 5: Pre-sizing (ТЗ 3.3.2 строка 1023, 1050)
 - ✅ GATE 6: MLE Decision (ТЗ 3.3.2 строка 1023, 1051)
 - ✅ GATE 7: Liquidity Check (ТЗ 3.3.2 строка 1024, 1052)
+- ✅ GATE 8: Gap/Data Glitch (ТЗ 3.3.2 строка 1025, 1053)
 
 **Следующие (0%):**
-- ⏳ GATE 8: Gap/Data Glitch (ТЗ 3.3.2 строка 1025, 1053)
 - ⏳ GATE 9: Funding Filter (ТЗ 3.3.2 строка 1026, 1054)
-- ⏳ GATE 10-18: остальные gates
+- ⏳ GATE 10: Correlation/Exposure (ТЗ 3.3.2 строка 1027, 1055)
+- ⏳ GATE 11-18: остальные gates
 
 ---
 
-**Статус:** ✅ Готов к Iteration 14  
-**Следующий шаг:** Gatekeeper GATE 8 — Gap/Data Glitch Detection (ТЗ 3.3.2, обязательный, GATE 8)
+**Статус:** ✅ Готов к Iteration 15  
+**Следующий шаг:** Gatekeeper GATE 9 — Funding Filter + Proximity + Blackout (ТЗ 3.3.2, обязательный, GATE 9)

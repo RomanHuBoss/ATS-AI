@@ -2,7 +2,7 @@
 Domain models and value objects.
 
 Contains fundamental domain entities like RiskUnits, Position, Trade, Signal,
-and state models (MarketState, PortfolioState, MLEOutput).
+and state models (MarketState, PortfolioState, MLEOutput, Regime).
 """
 
 from src.core.domain.market_state import (
@@ -26,6 +26,14 @@ from src.core.domain.portfolio_state import (
 )
 from src.core.domain.position import Direction as PositionDirection
 from src.core.domain.position import Position
+from src.core.domain.regime import (
+    BaselineClass,
+    BaselineResult,
+    FinalRegime,
+    MRCClass,
+    MRCResult,
+    RegimeConflictInfo,
+)
 from src.core.domain.signal import Direction as SignalDirection
 from src.core.domain.signal import (
     EngineType,
@@ -96,5 +104,12 @@ __all__ = [
     # MLEOutput model
     "MLEOutput",
     "MLEDecision",
+    # Regime model
+    "MRCClass",
+    "BaselineClass",
+    "FinalRegime",
+    "MRCResult",
+    "BaselineResult",
+    "RegimeConflictInfo",
 ]
 

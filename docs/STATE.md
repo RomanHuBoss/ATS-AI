@@ -1,11 +1,86 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 6  
-**Статус:** Pydantic V2 State Models реализованы
+**Последнее обновление:** Iteration 7  
+**Статус:** Data Quality Score (DQS) System реализована
 
 ---
 
 ## Реализовано
+
+### Iteration 7: Data Quality Score (DQS) System — Staleness, Gap Detection, Cross-Validation & Hard-Gates
+
+**Цель:** Реализовать полную систему оценки качества данных (DQS) согласно ТЗ 3.3.1-3.3.1.1 с компонентами staleness checks, gap detection, cross-validation и hard-gates для критических нарушений.
+
+**Реализованные модули:**
+
+#### Data Quality System
+- ✅ `src/data/__init__.py` — пакет data модулей
+- ✅ `src/data/quality/__init__.py` — пакет quality модулей
+- ✅ `src/data/quality/staleness_checker.py` — **StalenessChecker**
+  * Проверка staleness для критических данных (price/volatility: ≤1000-2000ms, orderbook/liquidity: ≤200-500ms)
+  * Проверка staleness для некритических данных (funding/OI/basis/ADL: ≤30-120s)
+  * Hard-gates при превышении hard thresholds
+  * DQS компонент: clip(1 - age/hard_threshold, 0, 1)
+  * StalenessThresholds с кастомизацией порогов
+- ✅ `src/data/quality/gap_glitch_detector.py` — **GapGlitchDetector**
+  * NaN/inf detection в критических полях (price, ATR, spread, bid, ask, liquidity, volatility)
+  * Stale Book but Fresh Price detection
+  * Price jump detection (advisory)
+  * Spread anomaly detection (advisory)
+  * Агрегация glitch результатов с блокировкой
+- ✅ `src/data/quality/cross_validator.py` — **CrossValidator**
+  * Кросс-валидация цены между двумя источниками (xdev_bps)
+  * Oracle санит-чек (независимый третий источник)
+  * Hard-gate блокировка при xdev >= threshold
+  * Взвешенное DQS_sources с нормализацией весов
+- ✅ `src/data/quality/dqs.py` — **DQSChecker** (главный модуль)
+  * Ступенчатый DQS: DQS_critical, DQS_noncritical, DQS_sources
+  * Итоговый DQS = dqs_weight_critical * DQS_critical + (1 - dqs_weight_critical) * DQS_noncritical
+  * Hard-gates: DQS_critical=0, staleness > hard, xdev >= threshold, glitches, oracle block, DQS_sources < min
+  * dqs_mult для degrade scenarios (linear interpolation между emergency и degraded thresholds)
+  * DQSComponents для прозрачности вычислений
+  * DQSResult с итоговым DQS, dqs_mult, hard-gate флагами и детальной диагностикой
+
+#### Тестирование
+- ✅ `tests/unit/test_dqs_system.py` — Комплексные тесты DQS системы (50 тестов)
+  * StalenessChecker тесты (15 тестов): fresh/soft/hard staleness, missing timestamps, critical/noncritical, custom thresholds, DQS component calculation
+  * GapGlitchDetector тесты (10 тестов): NaN/inf detection, stale book detection, price jump, spread anomaly, aggregation
+  * CrossValidator тесты (10 тестов): cross-validation, xdev thresholds, oracle sanity, DQS_sources calculation
+  * DQSChecker тесты (15 тестов): full DQS evaluation, hard-gates (staleness, xdev, NaN/inf, oracle, DQS_sources), dqs_mult scenarios, multiple hard-gates, immutability
+  * Все 50 тестов проходят ✅
+
+**Статус сборки:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/ ✅ (**379 тестов, все проходят** — добавлено 50 тестов)
+- DQS система: все компоненты работают и покрыты тестами ✅
+- Hard-gates: корректная блокировка при критических нарушениях ✅
+- Degrade scenarios: dqs_mult корректно вычисляется для DEFENSIVE mode ✅
+
+**Покрытие ТЗ:**
+- ТЗ 3.3.1 (Staleness, кросс-валидация, DQS) — **100%** (реализовано и протестировано)
+- ТЗ 3.3.1.1 (Hard-gates, ступенчатый DQS, dqs_mult) — **100%** (реализовано и протестировано)
+- ТЗ 3.3.2 GATE 0 (DQS requirements) — **100%** (модули готовы к интеграции в gatekeeper)
+- Staleness checks — **100%** (critical и noncritical данные)
+- Gap/glitch detection — **100%** (NaN/inf, stale book, price jump, spread anomaly)
+- Cross-validation — **100%** (primary, secondary, oracle источники)
+- Hard-gates — **100%** (все сценарии блокировки)
+- Degrade scenarios — **100%** (dqs_mult для DEFENSIVE mode)
+
+**Инварианты и гарантии:**
+1. **Staleness checks** — детерминированные проверки с hard thresholds для HALT
+2. **DQS components** — clip(1 - age/hard, 0, 1) для каждого источника
+3. **Hard-gates priority** — любой hard-gate → HALT, DQS = 0
+4. **Immutability** — все result объекты frozen=True
+5. **Conservative approach** — DQS_critical берет минимум из компонентов
+6. **Weighted DQS_sources** — нормализация весов источников
+7. **Cross-validation** — xdev_bps с epsilon-защитой
+8. **Oracle sanity** — блокировка только при валидном staleness oracle
+9. **NaN/inf detection** — все критические поля проверяются
+10. **Degrade scenarios** — linear interpolation dqs_mult между thresholds
+11. **Transparency** — DQSComponents содержит все промежуточные вычисления
+12. **Diagnostics** — детальные details и block_reason для debugging
+
+---
 
 ### Iteration 6: Pydantic V2 State Models — MarketState, PortfolioState, MLEOutput
 
@@ -426,18 +501,31 @@
 - **Iteration 4**: 100% (Domain Models полностью покрыты тестами — 39 тестов)
 - **Iteration 5**: 100% (JSON Schema Contracts полностью покрыты тестами — 42 теста)
 - **Iteration 6**: 100% (Pydantic State Models полностью покрыты тестами — 40 тестов)
+- **Iteration 7**: 100% (Data Quality Score полностью покрыт тестами — 50 тестов)
 
 ### Соответствие ТЗ
-- **Обязательные требования реализовано**: 6 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models)
-- **Процент готовности**: ~12%
+- **Обязательные требования реализовано**: 7 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models + DQS)
+- **Процент готовности**: ~14%
 
 ### Следующие вехи
-- **Iteration 7-8** (1-2 недели): DQS → ~18%
-- **Iteration 9-13** (2-3 недели): Risk Core → ~30%
+- **Iteration 8-9** (1-2 недели): Gatekeeper GATE 0 + DRP → ~18%
+- **Iteration 10-14** (2-3 недели): Risk Core → ~30%
 
 ---
 
 ## Заметки для команды
+
+**Iteration 7 — Data Quality Score (DQS):**
+1. **Conservative approach** — DQS_critical берет минимум из компонентов (самый строгий подход)
+2. **Hard-gates priority** — любой hard-gate → HALT, DQS = 0 (fail-safe)
+3. **Staleness thresholds** — critical (1-2s для price, 200-500ms для orderbook), noncritical (30-120s)
+4. **Cross-validation** — xdev_bps между primary и secondary источниками, oracle санит-чек
+5. **Gap detection** — NaN/inf блокирует торговлю, stale book detection
+6. **dqs_mult** — linear interpolation между emergency (0.3) и degraded (0.7) thresholds для degrade scenarios
+7. **DQSComponents** — полная прозрачность промежуточных вычислений (critical, noncritical, sources, каждый staleness)
+8. **Immutability** — все result объекты frozen=True для безопасности
+9. **Weighted sources** — DQS_sources с нормализацией весов (sum(w_i) = 1.0)
+10. **Integration ready** — модули готовы к интеграции в Gatekeeper GATE 0, требуется DRP state machine
 
 **Iteration 6 — Pydantic State Models:**
 1. **Pydantic V2** — все state модели используют Pydantic V2 с frozen=True для immutability
@@ -494,5 +582,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 7  
-**Следующий шаг:** DQS — Data Quality Score (ТЗ 9.2, обязательное, GATE 0)
+**Статус:** ✅ Готов к Iteration 8  
+**Следующий шаг:** Gatekeeper GATE 0 — интеграция DQS с warm-up, DRP transitions, anti-flapping (ТЗ 3.3.2, обязательное, GATE 0)

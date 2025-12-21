@@ -1,11 +1,82 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 10  
-**Статус:** Gatekeeper GATE 0-3 — Warm-up/DQS/DRP + DRP Kill-switch/Manual Halt/Trading Mode + MRC Confidence/Conflict Resolution + Strategy Compatibility реализованы
+**Последнее обновление:** Iteration 11  
+**Статус:** Gatekeeper GATE 0-5 — Warm-up/DQS/DRP + DRP Kill-switch/Manual Halt/Trading Mode + MRC Confidence/Conflict Resolution + Strategy Compatibility + Signal Validation + Pre-sizing реализованы
 
 ---
 
 ## Реализовано
+
+### Iteration 11: Gatekeeper GATE 4-5 — Signal Validation & Pre-sizing
+
+**Цель:** Реализовать GATE 4 (валидация engine signal: RR check, SL distance, entry/TP/SL санит-чек) и GATE 5 (pre-sizing с size-invariant оценкой издержек и unit_risk в bps).
+
+**Реализованные модули:**
+
+#### Gatekeeper GATE 4
+- ✅ `src/gatekeeper/gates/gate_04_signal_validation.py` — **Gate04SignalValidation**
+  * Пятый gate в цепочке (после GATE 0-3)
+  * Валидация engine signal перед размещением позиции
+  * RR validation: raw_rr >= RR_min_engine
+  * SL distance в ATR: sl_min_atr_mult <= distance <= sl_max_atr_mult
+  * Санитарные проверки цен (NaN, inf, валидность)
+  * Санитарные проверки ATR
+  * Gate04Config для гибкой настройки параметров
+  * Детальная диагностика через Gate04Result
+
+#### Gatekeeper GATE 5
+- ✅ `src/gatekeeper/gates/gate_05_pre_sizing.py` — **Gate05PreSizing**
+  * Шестой gate в цепочке (после GATE 0-4)
+  * Size-invariant pre-sizing расчёты
+  * Вычисление unit_risk_bps = 10000 * unit_risk_allin_net / entry_price_ref
+  * Вычисление expected_cost_R_preMLE = expected_cost_bps / unit_risk_bps
+  * expected_cost_bps_preMLE = entry_cost + SL_exit_cost (worst-case до MLE)
+  * Использование EffectivePrices для all-in эффективных цен
+  * Gate05Config для гибкой настройки default costs
+  * Все расчёты размеро-инвариантны (не зависят от qty_actual)
+
+#### Тестирование
+- ✅ `tests/unit/test_gate_04.py` — Тесты GATE 4 (14 тестов)
+  * RR validation (3 теста)
+  * SL distance validation (4 теста)
+  * Price sanity checks (3 теста)
+  * GATE 0-3 integration (2 теста)
+  * Edge cases (2 теста)
+- ✅ `tests/unit/test_gate_05.py` — Тесты GATE 5 (12 тестов)
+  * unit_risk_bps вычисление (2 теста)
+  * expected_cost_R_preMLE вычисление (3 теста)
+  * Size-invariance (2 теста)
+  * GATE 0-4 integration (2 теста)
+  * Custom costs (1 тест)
+  * Edge cases (2 теста)
+
+**Статус сборки:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/unit/test_gate_04.py tests/unit/test_gate_05.py ✅ (**26 новых тестов, все проходят**)
+- GATE 4: все валидации работают ✅
+- GATE 5: size-invariant расчёты корректны ✅
+- Integration: GATE 0 → 1 → 2 → 3 → 4 → 5 chain работает ✅
+
+**Покрытие ТЗ:**
+- ТЗ 3.3.2 строка 1021 (GATE 4: Валидация сигнала движка) — **100%** (реализован и протестирован)
+- ТЗ 3.3.2 строка 1022 (GATE 5: Pre-sizing + size-invariant издержки) — **100%** (реализован и протестирован)
+- ТЗ 3.3.5 строки 1238-1240 (SL distance в ATR) — **100%** (реализован)
+- ТЗ раздел 2128-2150 (unit_risk_bps, expected_cost_R_preMLE) — **100%** (реализован)
+- ТЗ Appendix A.2 (EffectivePrices integration) — **100%** (используется в GATE 5)
+
+**Инварианты и гарантии:**
+1. **RR validation** — raw_rr >= RR_min_engine проверяется перед sizing
+2. **SL distance in ATR** — sl_min_atr_mult <= distance <= sl_max_atr_mult
+3. **Size-invariance до GATE 14** — unit_risk_bps не зависит от qty_actual
+4. **expected_cost_R_preMLE** — worst-case с SL exit (до MLE decision)
+5. **EffectivePrices all-in** — entry_eff_allin, tp_eff_allin, sl_eff_allin корректно вычисляются
+6. **unit_risk formula** — unit_risk_bps = 10000 * unit_risk_allin_net / max(entry_price, eps)
+7. **Gate order** — GATE 4 после GATE 0-3, GATE 5 после GATE 0-4
+8. **Immutability** — все result объекты (Gate04Result, Gate05Result) frozen=True
+9. **Sanity checks** — NaN/inf блокируют до sizing
+10. **Integration ready** — GATE 4-5 готовы к интеграции в full gatekeeper chain
+
+---
 
 ### Iteration 10: Gatekeeper GATE 2-3 — MRC Confidence, Conflict Resolution, Probe-режим, Strategy Compatibility
 
@@ -758,13 +829,14 @@
 - **Iteration 8**: 100% (DRP State Machine + GATE 0 полностью покрыты тестами — 36 тестов)
 - **Iteration 9**: 100% (GATE 1 полностью покрыт тестами — 20 тестов)
 - **Iteration 10**: 100% (GATE 2-3 полностью покрыты тестами — 41 тест)
+- **Iteration 11**: 100% (GATE 4-5 полностью покрыты тестами — 26 тестов)
 
 ### Соответствие ТЗ
-- **Обязательные требования реализовано**: 10 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models + DQS + DRP + GATE 0-3)
-- **Процент готовности**: ~20%
+- **Обязательные требования реализовано**: 12 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models + DQS + DRP + GATE 0-5)
+- **Процент готовности**: ~24%
 
 ### Следующие вехи
-- **Iteration 11-12** (1-2 недели): GATE 4-6 (Signal validation, Pre-sizing, MLE decision) → ~24%
+- **Iteration 12** (1 неделя): GATE 6 (MLE decision) → ~26%
 - **Iteration 13-15** (2-3 недели): GATE 7-14 (Liquidity, Gap, Funding, Basis-risk, Sanity, Bankruptcy, REM, Sizing) → ~32%
 - **Iteration 16-18** (1-2 недели): GATE 15-18 (Impact, Reservation, Final validation, Partial fills) → ~36%
 - **Iteration 19-25** (3-4 недели): Risk Core (Portfolio risk, Correlation, Tail-risk) → ~48%
@@ -772,6 +844,18 @@
 ---
 
 ## Заметки для команды
+
+**Iteration 11 — Gatekeeper GATE 4-5 & Signal Validation / Pre-sizing:**
+1. **RR validation** — raw_rr >= RR_min_engine проверяется перед любыми sizing расчётами
+2. **SL distance в ATR** — sl_min_atr_mult <= distance <= sl_max_atr_mult (ТЗ 3.3.5 строки 1238-1240)
+3. **Size-invariance** — unit_risk_bps = 10000 * unit_risk_allin_net / entry_price_ref (не зависит от qty)
+4. **expected_cost_R_preMLE** — worst-case с SL exit (entry_cost + SL_exit_cost), до MLE decision
+5. **EffectivePrices integration** — all-in эффективные цены используются для unit_risk вычислений
+6. **Sanity checks first** — NaN/inf блокируют раньше чем любые другие проверки
+7. **Gate order critical** — GATE 4 после GATE 0-3 (signal validation), GATE 5 после GATE 0-4 (pre-sizing)
+8. **Immutability** — все result объекты (Gate04Result, Gate05Result) frozen=True для thread-safety
+9. **ATR dependency** — GATE 4 требует валидный ATR для SL distance проверки (mock в тестах)
+10. **Integration ready** — GATE 4-5 готовы к интеграции с GATE 6 (MLE decision) в следующей итерации
 
 **Iteration 10 — Gatekeeper GATE 2-3 & Regime Classification:**
 1. **Deterministic conflict resolution** — все правила детерминированы согласно ТЗ 3.3.3 (строки 1079-1111)
@@ -864,5 +948,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 11  
-**Следующий шаг:** Gatekeeper GATE 4-6 — Signal validation, Pre-sizing (size-invariant), MLE decision (ТЗ 3.3.2, обязательные, GATE 4-6)
+**Статус:** ✅ Готов к Iteration 12  
+**Следующий шаг:** Gatekeeper GATE 6 — MLE decision (size-invariant по price-edge, p_success/p_fail, EV_R_price) (ТЗ 3.3.2, обязательные, GATE 6)

@@ -1,11 +1,100 @@
 # ATS-AI v3.30 — Состояние разработки
 
-**Последнее обновление:** Iteration 7  
-**Статус:** Data Quality Score (DQS) System реализована
+**Последнее обновление:** Iteration 8  
+**Статус:** Gatekeeper GATE 0 — Warm-up, DQS Integration, DRP State Machine, Anti-flapping реализованы
 
 ---
 
 ## Реализовано
+
+### Iteration 8: Gatekeeper GATE 0 — Warm-up, DQS Integration, DRP Transitions, Anti-flapping
+
+**Цель:** Реализовать полный GATE 0 системы Gatekeeper с интеграцией DQS, DRP state machine с переходами на основе DQS, warm-up логикой после emergency и anti-flapping механизмами.
+
+**Реализованные модули:**
+
+#### DRP (Disaster Recovery Protocol)
+- ✅ `src/drp/__init__.py` — пакет DRP модулей
+- ✅ `src/drp/state_machine.py` — **DRPStateMachine**
+  * Переходы состояний на основе DQS (NORMAL/DEFENSIVE/EMERGENCY/RECOVERY/HIBERNATE)
+  * Warm-up после emergency с зависимостью от emergency_cause (DATA_GLITCH: 3 bars, LIQUIDITY: 6, DEPEG: 24, OTHER: configurable)
+  * Anti-flapping с ATR-зависимым скользящим окном (flap_window_minutes_eff)
+  * Автоматический переход в HIBERNATE при flap_count >= threshold
+  * EmergencyCause enum для типизации причин emergency
+  * WarmupConfig и AntiFlappingConfig для гибкой настройки
+  * История переходов для подсчета flapping в скользящем окне
+
+#### Gatekeeper
+- ✅ `src/gatekeeper/__init__.py` — пакет Gatekeeper модулей
+- ✅ `src/gatekeeper/gates/__init__.py` — пакет gates модулей
+- ✅ `src/gatekeeper/gates/gate_00_warmup_dqs.py` — **Gate00WarmupDQS**
+  * Первый gate в цепочке Gatekeeper
+  * Интеграция DQSChecker для оценки качества данных
+  * Интеграция DRPStateMachine для управления состоянием
+  * Блокировка входов при hard-gates (DQS_critical=0, staleness > hard, xdev >= threshold, NaN/inf, oracle block)
+  * Блокировка входов при EMERGENCY/RECOVERY/HIBERNATE states
+  * Warm-up проверка (блокировка пока warm-up не завершен)
+  * HIBERNATE unlock after timeout
+  * Детальная диагностика (DQS, DRP transitions, блокировки)
+
+#### Тестирование
+- ✅ `tests/unit/test_drp_state_machine.py` — Тесты DRP state machine (18 тестов)
+  * DQS-based transitions (NORMAL/DEFENSIVE/EMERGENCY)
+  * Hard-gate transitions
+  * Warm-up после emergency (все причины: DATA_GLITCH, LIQUIDITY, DEPEG, OTHER)
+  * Warm-up completion и RECOVERY → NORMAL
+  * Anti-flapping счетчик с increment
+  * Anti-flapping → HIBERNATE при превышении порога
+  * ATR-адаптация flap window
+  * HIBERNATE unlock after timeout
+  * Edge cases (new emergency during recovery, stable state)
+- ✅ `tests/unit/test_gate_00.py` — Тесты GATE 0 (18 тестов)
+  * PASS scenarios (NORMAL state, good DQS, warm-up completed, hibernate unlock)
+  * Hard-gates блокировка (NaN, critical staleness, xdev threshold)
+  * EMERGENCY блокировка
+  * RECOVERY/warm-up блокировка
+  * HIBERNATE блокировка
+  * Transitions (NORMAL → DEFENSIVE, NORMAL → EMERGENCY)
+  * Anti-flapping integration
+  * DQS mult в DEFENSIVE mode
+  * Cross-validation integration
+  * Oracle sanity integration
+  * Warm-up bars decrement/no-decrement
+  * Details field populated
+
+**Статус сборки:**
+- Установка: pip install -e . ✅
+- Тесты: pytest tests/ ✅ (**415 тестов, все проходят** — добавлено 36 тестов)
+- DRP State Machine: все transitions работают корректно ✅
+- GATE 0: все блокировки и интеграции работают ✅
+- Anti-flapping: flap count с ATR-адаптацией работает ✅
+- Warm-up: все причины emergency корректно обрабатываются ✅
+
+**Покрытие ТЗ:**
+- ТЗ 3.3.2 GATE 0 (Warm-up / Data Availability / Cross-Validation / Hard-gates / DQS) — **100%** (реализован и протестирован)
+- ТЗ строки 958-982 (Warm-up после аварии данных, anti-flapping) — **100%** (реализовано и протестировано)
+- ТЗ строка 2771 (DRP_state enum) — **100%** (все states поддерживаются)
+- ТЗ строки 963-969 (warmup_required_bars по emergency_cause) — **100%** (реализовано)
+- ТЗ строки 973-981 (Anti-flapping механизм) — **100%** (реализовано с ATR-адаптацией)
+- DRP transitions на основе DQS — **100%** (EMERGENCY, DEFENSIVE, NORMAL, RECOVERY, HIBERNATE)
+- Warm-up логика — **100%** (автоматический decrement при successful bar)
+- Anti-flapping → HIBERNATE — **100%** (автоматический переход при превышении порога)
+
+**Инварианты и гарантии:**
+1. **DRP transitions** — детерминированные переходы на основе DQS thresholds (0.3, 0.7)
+2. **Hard-gate priority** — hard-gate блокирует раньше DRP transitions
+3. **Warm-up enforcement** — RECOVERY state блокирует входы до завершения warm-up
+4. **Emergency causes** — warmup_required_bars корректно зависят от cause
+5. **Anti-flapping window** — ATR-адаптация: window = base / max(ATR_z_short, 1)
+6. **Flap counting** — только переходы к/от строгих состояний (EMERGENCY/RECOVERY/DEFENSIVE)
+7. **HIBERNATE timeout** — автоматический unlock после hibernate_min_duration_sec
+8. **Immutability** — все result объекты frozen=True (DRPTransitionResult, Gate00Result)
+9. **State consistency** — DRP state всегда согласован с DQS и hard-gates
+10. **Transition history** — скользящее окно для flap count с cutoff по времени
+11. **GATE 0 order** — первый gate, выполняется до всех остальных
+12. **Integration ready** — GATE 0 готов к интеграции с остальными gates (1-18)
+
+---
 
 ### Iteration 7: Data Quality Score (DQS) System — Staleness, Gap Detection, Cross-Validation & Hard-Gates
 
@@ -502,18 +591,33 @@
 - **Iteration 5**: 100% (JSON Schema Contracts полностью покрыты тестами — 42 теста)
 - **Iteration 6**: 100% (Pydantic State Models полностью покрыты тестами — 40 тестов)
 - **Iteration 7**: 100% (Data Quality Score полностью покрыт тестами — 50 тестов)
+- **Iteration 8**: 100% (DRP State Machine + GATE 0 полностью покрыты тестами — 36 тестов)
 
 ### Соответствие ТЗ
-- **Обязательные требования реализовано**: 7 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models + DQS)
-- **Процент готовности**: ~14%
+- **Обязательные требования реализовано**: 8 из ~50 (RiskUnits + EffectivePrices + Numerical Safeguards + Compounding + Domain Models + JSON Schema + Pydantic State Models + DQS + DRP + GATE 0)
+- **Процент готовности**: ~16%
 
 ### Следующие вехи
-- **Iteration 8-9** (1-2 недели): Gatekeeper GATE 0 + DRP → ~18%
-- **Iteration 10-14** (2-3 недели): Risk Core → ~30%
+- **Iteration 9-11** (1-2 недели): GATE 1-6 (DRP kill-switch, MRC, Strategy compatibility, Signal validation, Pre-sizing, MLE decision) → ~22%
+- **Iteration 12-15** (2-3 недели): GATE 7-14 (Liquidity, Gap, Funding, Basis-risk, Sanity, Bankruptcy, REM, Sizing) → ~30%
+- **Iteration 16-18** (1-2 недели): GATE 15-18 (Impact, Reservation, Final validation, Partial fills) → ~34%
+- **Iteration 19-25** (3-4 недели): Risk Core (Portfolio risk, Correlation, Tail-risk) → ~46%
 
 ---
 
 ## Заметки для команды
+
+**Iteration 8 — Gatekeeper GATE 0 & DRP State Machine:**
+1. **DRP transitions** — детерминированные переходы на основе DQS: < 0.3 → EMERGENCY, 0.3-0.7 → DEFENSIVE, ≥ 0.7 → NORMAL
+2. **Hard-gate priority** — hard-gate всегда блокирует раньше чем DRP state check, обеспечивая fail-safe
+3. **Warm-up enforcement** — после EMERGENCY → RECOVERY с обязательным warm-up периодом (новые входы запрещены)
+4. **Emergency causes** — warmup_required_bars зависят от cause: DATA_GLITCH (3), LIQUIDITY (6), DEPEG (24), OTHER (configurable)
+5. **Anti-flapping** — переходы к/от строгих состояний (EMERGENCY/RECOVERY/DEFENSIVE) считаются в скользящем окне
+6. **ATR-адаптация** — flap window адаптируется к волатильности: window = base / max(ATR_z_short, 1)
+7. **HIBERNATE mode** — автоматический переход при flap_count >= threshold, требует timeout или ручной unlock
+8. **Transition history** — история переходов хранится в памяти DRPStateMachine, очищается по окну
+9. **Immutability** — все result объекты (DRPTransitionResult, Gate00Result) frozen=True для безопасности
+10. **Integration ready** — GATE 0 полностью готов к интеграции с остальными gates, DRP state machine может использоваться автономно
 
 **Iteration 7 — Data Quality Score (DQS):**
 1. **Conservative approach** — DQS_critical берет минимум из компонентов (самый строгий подход)
@@ -582,5 +686,5 @@
 
 ---
 
-**Статус:** ✅ Готов к Iteration 8  
-**Следующий шаг:** Gatekeeper GATE 0 — интеграция DQS с warm-up, DRP transitions, anti-flapping (ТЗ 3.3.2, обязательное, GATE 0)
+**Статус:** ✅ Готов к Iteration 9  
+**Следующий шаг:** Gatekeeper GATE 1-6 — DRP kill-switch, MRC confidence, Strategy compatibility, Signal validation, Pre-sizing, MLE decision (ТЗ 3.3.2-3.3.3, обязательные, GATE 1-6)
